@@ -1,0 +1,176 @@
+#!/usr/bin/env guile
+!#
+(use-modules (ice-9 format)
+             (ice-9 rdelim)
+             (ice-9 regex)
+             (rnrs bytevectors)
+             (rnrs io ports))
+
+;;; MiniHash: FNV-1a variant, 64-bit, 16-char hex
+(define (minihash bv)
+  (let ((len (bytevector-length bv)))
+    (let loop ((i 0) (h 1469598103934665603))
+      (if (>= i len)
+          (format #f "~16,'0x" h)
+          (let* ((b (bytevector-u8-ref bv i))
+                 (h1 (logxor h b))
+                 (h2 (modulo (* h1 1099511628211) (expt 2 64))))
+            (loop (+ i 1) h2))))))
+
+(define (minihash-file filename)
+  (let* ((port (open-file filename "rb"))
+         (data (get-bytevector-all port)))
+    (close-port port)
+    (if (eof-object? data)
+        (minihash (make-bytevector 0))
+        (minihash data))))
+
+;;; File helpers
+(define (file-exists? f)
+  (access? f F_OK))
+
+(define (read-file-string filename)
+  (let* ((port (open-input-file filename))
+         (content (get-string-all port)))
+    (close-port port)
+    content))
+
+(define (write-file-string filename content)
+  (let ((port (open-output-file filename)))
+    (display content port)
+    (close-port port)))
+
+(define (read-lines filename)
+  (if (not (file-exists? filename))
+      '()
+      (let ((content (read-file-string filename)))
+        (if (string=? content "")
+            '()
+            (filter (lambda (s) (not (string=? s "")))
+                    (string-split content #\newline))))))
+
+(define (copy-file-binary src dst)
+  (let* ((in (open-file src "rb"))
+         (data (get-bytevector-all in)))
+    (close-port in)
+    (let ((out (open-file dst "wb")))
+      (unless (eof-object? data)
+        (put-bytevector out data))
+      (close-port out))))
+
+;;; Commands
+
+(define (cmd-init)
+  (if (file-exists? ".minigit")
+      (display "Repository already initialized\n")
+      (begin
+        (mkdir ".minigit")
+        (mkdir ".minigit/objects")
+        (mkdir ".minigit/commits")
+        (write-file-string ".minigit/index" "")
+        (write-file-string ".minigit/HEAD" ""))))
+
+(define (cmd-add filename)
+  (if (not (file-exists? filename))
+      (begin
+        (display "File not found\n")
+        (exit 1))
+      (let ((hash (minihash-file filename)))
+        ;; Store blob
+        (let ((objpath (string-append ".minigit/objects/" hash)))
+          (unless (file-exists? objpath)
+            (copy-file-binary filename objpath)))
+        ;; Update index
+        (let ((lines (read-lines ".minigit/index")))
+          (unless (member filename lines)
+            (let ((port (open-file ".minigit/index" "a")))
+              (display filename port)
+              (newline port)
+              (close-port port)))))))
+
+(define (cmd-commit message)
+  (let ((index-lines (read-lines ".minigit/index")))
+    (if (null? index-lines)
+        (begin
+          (display "Nothing to commit\n")
+          (exit 1))
+        (let* ((head-content (string-trim-both (read-file-string ".minigit/HEAD")))
+               (parent (if (string=? head-content "") "NONE" head-content))
+               (timestamp (number->string (current-time)))
+               (sorted-files (sort index-lines string<?))
+               ;; Build file entries with hashes
+               (file-entries
+                (map (lambda (fname)
+                       (let ((hash (minihash-file fname)))
+                         (string-append fname " " hash)))
+                     sorted-files))
+               ;; Build commit content
+               (commit-content
+                (string-append
+                 "parent: " parent "\n"
+                 "timestamp: " timestamp "\n"
+                 "message: " message "\n"
+                 "files:\n"
+                 (string-join file-entries "\n")
+                 "\n"))
+               ;; Hash the commit content
+               (commit-hash (minihash (string->utf8 commit-content))))
+          ;; Write commit file
+          (write-file-string (string-append ".minigit/commits/" commit-hash) commit-content)
+          ;; Update HEAD
+          (write-file-string ".minigit/HEAD" commit-hash)
+          ;; Clear index
+          (write-file-string ".minigit/index" "")
+          ;; Print
+          (format #t "Committed ~a\n" commit-hash)))))
+
+(define (cmd-log)
+  (let ((head-content (string-trim-both (read-file-string ".minigit/HEAD"))))
+    (if (string=? head-content "")
+        (display "No commits\n")
+        (let loop ((hash head-content) (first #t))
+          (when (and (not (string=? hash "NONE")) (not (string=? hash "")))
+            (let* ((commit-file (string-append ".minigit/commits/" hash))
+                   (content (read-file-string commit-file))
+                   (lines (string-split content #\newline)))
+              ;; Parse parent, timestamp, message
+              (let ((parent "NONE")
+                    (timestamp "")
+                    (message ""))
+                (for-each
+                 (lambda (line)
+                   (cond
+                    ((string-prefix? "parent: " line)
+                     (set! parent (substring line 8)))
+                    ((string-prefix? "timestamp: " line)
+                     (set! timestamp (substring line 11)))
+                    ((string-prefix? "message: " line)
+                     (set! message (substring line 9)))))
+                 lines)
+                (unless first (newline))
+                (format #t "commit ~a\n" hash)
+                (format #t "Date: ~a\n" timestamp)
+                (format #t "Message: ~a\n" message)
+                (loop parent #f))))))))
+
+;;; Main
+(let ((args (cdr (command-line))))
+  (if (null? args)
+      (begin
+        (display "Usage: minigit <command>\n")
+        (exit 1))
+      (let ((cmd (car args)))
+        (cond
+         ((string=? cmd "init") (cmd-init))
+         ((string=? cmd "add")
+          (if (< (length args) 2)
+              (begin (display "Usage: minigit add <file>\n") (exit 1))
+              (cmd-add (cadr args))))
+         ((string=? cmd "commit")
+          (if (< (length args) 3)
+              (begin (display "Usage: minigit commit -m <message>\n") (exit 1))
+              (cmd-commit (caddr args))))
+         ((string=? cmd "log") (cmd-log))
+         (else
+          (format #t "Unknown command: ~a\n" cmd)
+          (exit 1))))))

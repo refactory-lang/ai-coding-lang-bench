@@ -1,0 +1,115 @@
+let read_file path =
+  let ic = open_in_bin path in
+  let n = in_channel_length ic in
+  let s = Bytes.create n in
+  really_input ic s 0 n;
+  close_in ic;
+  Bytes.to_string s
+
+let write_file path content =
+  let oc = open_out_bin path in
+  output_string oc content;
+  close_out oc
+
+let read_index () =
+  let content = read_file ".minigit/index" in
+  if String.trim content = "" then []
+  else
+    String.split_on_char '\n' content
+    |> List.filter (fun s -> s <> "")
+
+let minihash data =
+  let h = ref Int64.zero in
+  h := Int64.of_string "1469598103934665603";
+  String.iter (fun c ->
+    let b = Int64.of_int (Char.code c) in
+    h := Int64.logxor !h b;
+    h := Int64.mul !h (Int64.of_string "1099511628211")
+  ) data;
+  Printf.sprintf "%016Lx" !h
+
+let cmd_init () =
+  if Sys.file_exists ".minigit" then
+    print_string "Repository already initialized\n"
+  else begin
+    Unix.mkdir ".minigit" 0o755;
+    Unix.mkdir ".minigit/objects" 0o755;
+    Unix.mkdir ".minigit/commits" 0o755;
+    write_file ".minigit/index" "";
+    write_file ".minigit/HEAD" ""
+  end
+
+let cmd_add file =
+  if not (Sys.file_exists file) then begin
+    print_string "File not found\n";
+    exit 1
+  end;
+  let content = read_file file in
+  let hash = minihash content in
+  write_file (".minigit/objects/" ^ hash) content;
+  let index = read_index () in
+  if not (List.mem file index) then begin
+    let oc = open_out_gen [Open_append; Open_creat] 0o644 ".minigit/index" in
+    output_string oc (file ^ "\n");
+    close_out oc
+  end
+
+let cmd_commit msg =
+  let index = read_index () in
+  if index = [] then begin
+    print_string "Nothing to commit\n";
+    exit 1
+  end;
+  let head_content = String.trim (read_file ".minigit/HEAD") in
+  let parent = if head_content = "" then "NONE" else head_content in
+  let timestamp = int_of_float (Unix.time ()) in
+  let sorted_files = List.sort String.compare index in
+  let file_lines = List.map (fun f ->
+    let content = read_file f in
+    let hash = minihash content in
+    f ^ " " ^ hash
+  ) sorted_files in
+  let commit_content = Printf.sprintf "parent: %s\ntimestamp: %d\nmessage: %s\nfiles:\n%s\n"
+    parent timestamp msg (String.concat "\n" file_lines) in
+  let commit_hash = minihash commit_content in
+  write_file (".minigit/commits/" ^ commit_hash) commit_content;
+  write_file ".minigit/HEAD" commit_hash;
+  write_file ".minigit/index" "";
+  Printf.printf "Committed %s\n" commit_hash
+
+let rec log_traverse hash =
+  let path = ".minigit/commits/" ^ hash in
+  let content = read_file path in
+  let lines = String.split_on_char '\n' content in
+  let parent = ref "" in
+  let timestamp = ref "" in
+  let message = ref "" in
+  List.iter (fun line ->
+    if String.length line > 8 && String.sub line 0 8 = "parent: " then
+      parent := String.sub line 8 (String.length line - 8)
+    else if String.length line > 11 && String.sub line 0 11 = "timestamp: " then
+      timestamp := String.sub line 11 (String.length line - 11)
+    else if String.length line > 9 && String.sub line 0 9 = "message: " then
+      message := String.sub line 9 (String.length line - 9)
+  ) lines;
+  Printf.printf "commit %s\nDate: %s\nMessage: %s\n\n" hash !timestamp !message;
+  if !parent <> "NONE" then
+    log_traverse !parent
+
+let cmd_log () =
+  let head = String.trim (read_file ".minigit/HEAD") in
+  if head = "" then
+    print_string "No commits\n"
+  else
+    log_traverse head
+
+let () =
+  let args = Array.to_list Sys.argv |> List.tl in
+  match args with
+  | ["init"] -> cmd_init ()
+  | ["add"; file] -> cmd_add file
+  | ["commit"; "-m"; msg] -> cmd_commit msg
+  | ["log"] -> cmd_log ()
+  | _ ->
+    Printf.eprintf "Unknown command\n";
+    exit 1

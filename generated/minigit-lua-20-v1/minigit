@@ -1,0 +1,306 @@
+#!/usr/bin/env lua
+
+-- MiniGit: a minimal version control system in Lua
+
+local MINIGIT_DIR = ".minigit"
+
+-- MiniHash: FNV-1a variant, 64-bit, 16-char hex output
+local function minihash(data)
+    -- We need 64-bit unsigned arithmetic. Lua 5.3+ has native 64-bit integers.
+    -- For Lua 5.1/5.2 we use modular arithmetic with floats (doubles have 53-bit mantissa,
+    -- but we need 64-bit). We'll use the integer type if available.
+    local h = 1469598103934665603
+
+    -- Check if we have 64-bit integers (Lua 5.3+)
+    if math.type then
+        -- Lua 5.3+ with native integers
+        for i = 1, #data do
+            local b = string.byte(data, i)
+            h = h ~ b
+            -- multiply mod 2^64 happens naturally with integer overflow in Lua 5.3+
+            -- But Lua 5.3 integers are signed 64-bit. We need to handle this carefully.
+            h = (h * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+        end
+        -- Format as 16-char zero-padded lowercase hex
+        return string.format("%016x", h & 0xFFFFFFFFFFFFFFFF)
+    else
+        -- Lua 5.1/5.2: use bit operations via manual computation
+        -- We'll split into high32 and low32
+        local lo = 0x9F470403  -- lower 32 bits of init
+        local hi = 0x14669619  -- upper 32 bits of init
+        local MOD32 = 2^32
+
+        for i = 1, #data do
+            local b = string.byte(data, i)
+            -- XOR with byte (only affects low bits)
+            lo = bit32 and bit32.bxor(lo, b) or lo  -- fallback
+            -- Actually let's do this properly for 5.1
+            -- XOR lo with b
+            local new_lo = 0
+            local tmp_lo = lo
+            local tmp_b = b
+            for bit = 0, 31 do
+                local lo_bit = tmp_lo % 2
+                local b_bit = tmp_b % 2
+                if lo_bit ~= b_bit then
+                    new_lo = new_lo + 2^bit
+                end
+                tmp_lo = math.floor(tmp_lo / 2)
+                tmp_b = math.floor(tmp_b / 2)
+            end
+            lo = new_lo
+
+            -- Multiply (hi:lo) * 1099511628211
+            -- 1099511628211 = 0x00000100 00000163
+            -- mul_hi = 0x100, mul_lo = 0x163
+            local mul_lo = 0x00000163
+            local mul_hi = 0x00000100
+
+            -- result = (hi:lo) * (mul_hi:mul_lo)
+            -- We only need lower 64 bits
+            local r_lo = lo * mul_lo
+            local r_carry = math.floor(r_lo / MOD32)
+            r_lo = r_lo % MOD32
+
+            local r_hi = (hi * mul_lo + lo * mul_hi + r_carry) % MOD32
+
+            lo = r_lo
+            hi = r_hi
+        end
+
+        return string.format("%08x%08x", hi, lo)
+    end
+end
+
+local function file_exists(path)
+    local f = io.open(path, "rb")
+    if f then f:close() return true end
+    return false
+end
+
+local function dir_exists(path)
+    -- Try to open path as a directory by listing it
+    local ok, _, code = os.rename(path, path)
+    if ok then return true end
+    -- On some systems, code 13 means permission denied (exists but no access)
+    if code == 13 then return true end
+    return false
+end
+
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local content = f:read("*a")
+    f:close()
+    return content
+end
+
+local function write_file(path, content)
+    local f = io.open(path, "wb")
+    if not f then return false end
+    f:write(content)
+    f:close()
+    return true
+end
+
+local function mkdir(path)
+    os.execute("mkdir -p " .. path)
+end
+
+-- Read index file, return list of filenames
+local function read_index()
+    local content = read_file(MINIGIT_DIR .. "/index")
+    if not content or content == "" then return {} end
+    local files = {}
+    for line in content:gmatch("[^\n]+") do
+        if line ~= "" then
+            files[#files + 1] = line
+        end
+    end
+    return files
+end
+
+-- Write index file
+local function write_index(files)
+    local content = ""
+    for _, f in ipairs(files) do
+        content = content .. f .. "\n"
+    end
+    write_file(MINIGIT_DIR .. "/index", content)
+end
+
+-- Check if value is in list
+local function list_contains(list, val)
+    for _, v in ipairs(list) do
+        if v == val then return true end
+    end
+    return false
+end
+
+-------------------------------------------------
+-- Commands
+-------------------------------------------------
+
+local function cmd_init()
+    if dir_exists(MINIGIT_DIR) then
+        print("Repository already initialized")
+        os.exit(0)
+    end
+    mkdir(MINIGIT_DIR .. "/objects")
+    mkdir(MINIGIT_DIR .. "/commits")
+    write_file(MINIGIT_DIR .. "/index", "")
+    write_file(MINIGIT_DIR .. "/HEAD", "")
+    os.exit(0)
+end
+
+local function cmd_add(filename)
+    if not filename then
+        io.stderr:write("Usage: minigit add <file>\n")
+        os.exit(1)
+    end
+    if not file_exists(filename) then
+        print("File not found")
+        os.exit(1)
+    end
+
+    local content = read_file(filename)
+    local hash = minihash(content)
+
+    write_file(MINIGIT_DIR .. "/objects/" .. hash, content)
+
+    local index = read_index()
+    if not list_contains(index, filename) then
+        index[#index + 1] = filename
+        write_index(index)
+    end
+
+    os.exit(0)
+end
+
+local function cmd_commit(args)
+    -- Parse -m "message"
+    local message = nil
+    for i = 1, #args do
+        if args[i] == "-m" and args[i + 1] then
+            message = args[i + 1]
+            break
+        end
+    end
+
+    if not message then
+        io.stderr:write("Usage: minigit commit -m \"<message>\"\n")
+        os.exit(1)
+    end
+
+    local index = read_index()
+    if #index == 0 then
+        print("Nothing to commit")
+        os.exit(1)
+    end
+
+    -- Get parent
+    local head = read_file(MINIGIT_DIR .. "/HEAD")
+    if head then head = head:match("^%s*(.-)%s*$") end  -- trim
+    local parent = (head and head ~= "") and head or "NONE"
+
+    -- Get timestamp
+    local timestamp = tostring(os.time())
+
+    -- Sort filenames
+    table.sort(index)
+
+    -- Build file entries: for each file, get its blob hash
+    local file_entries = {}
+    for _, fname in ipairs(index) do
+        local content = read_file(fname)
+        if content then
+            local hash = minihash(content)
+            file_entries[#file_entries + 1] = fname .. " " .. hash
+        end
+    end
+
+    -- Build commit content
+    local commit_content = "parent: " .. parent .. "\n"
+        .. "timestamp: " .. timestamp .. "\n"
+        .. "message: " .. message .. "\n"
+        .. "files:\n"
+
+    for _, entry in ipairs(file_entries) do
+        commit_content = commit_content .. entry .. "\n"
+    end
+
+    local commit_hash = minihash(commit_content)
+
+    write_file(MINIGIT_DIR .. "/commits/" .. commit_hash, commit_content)
+    write_file(MINIGIT_DIR .. "/HEAD", commit_hash)
+    write_file(MINIGIT_DIR .. "/index", "")
+
+    print("Committed " .. commit_hash)
+    os.exit(0)
+end
+
+local function cmd_log()
+    local head = read_file(MINIGIT_DIR .. "/HEAD")
+    if head then head = head:match("^%s*(.-)%s*$") end
+
+    if not head or head == "" then
+        print("No commits")
+        os.exit(0)
+    end
+
+    local current = head
+    local first = true
+    while current and current ~= "" and current ~= "NONE" do
+        local commit_content = read_file(MINIGIT_DIR .. "/commits/" .. current)
+        if not commit_content then break end
+
+        -- Parse commit
+        local parent_hash = commit_content:match("parent: ([^\n]+)")
+        local ts = commit_content:match("timestamp: ([^\n]+)")
+        local msg = commit_content:match("message: ([^\n]+)")
+
+        if not first then
+            print("")
+        end
+        first = false
+
+        print("commit " .. current)
+        print("Date: " .. ts)
+        print("Message: " .. msg)
+
+        current = parent_hash
+        if current == "NONE" then break end
+    end
+
+    os.exit(0)
+end
+
+-------------------------------------------------
+-- Main
+-------------------------------------------------
+
+local args = arg
+if #args < 1 then
+    io.stderr:write("Usage: minigit <command> [args]\n")
+    os.exit(1)
+end
+
+local command = args[1]
+
+if command == "init" then
+    cmd_init()
+elseif command == "add" then
+    cmd_add(args[2])
+elseif command == "commit" then
+    -- Pass remaining args
+    local commit_args = {}
+    for i = 2, #args do
+        commit_args[#commit_args + 1] = args[i]
+    end
+    cmd_commit(commit_args)
+elseif command == "log" then
+    cmd_log()
+else
+    io.stderr:write("Unknown command: " .. command .. "\n")
+    os.exit(1)
+end

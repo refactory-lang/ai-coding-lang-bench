@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+import sys
+import os
+
+
+def minihash(data):
+    h = 1469598103934665603
+    for b in data:
+        h ^= b
+        h = (h * 1099511628211) % (2**64)
+    return format(h, '016x')
+
+
+def cmd_init():
+    if os.path.isdir('.minigit'):
+        print("Repository already initialized")
+        return
+    os.makedirs('.minigit/objects', exist_ok=True)
+    os.makedirs('.minigit/commits', exist_ok=True)
+    with open('.minigit/index', 'w') as f:
+        pass
+    with open('.minigit/HEAD', 'w') as f:
+        pass
+
+
+def cmd_add(filename):
+    if not os.path.exists(filename):
+        print("File not found")
+        sys.exit(1)
+    with open(filename, 'rb') as f:
+        data = f.read()
+    h = minihash(data)
+    with open(os.path.join('.minigit/objects', h), 'wb') as f:
+        f.write(data)
+    # Read current index
+    with open('.minigit/index', 'r') as f:
+        lines = [l.strip() for l in f if l.strip()]
+    if filename not in lines:
+        lines.append(filename)
+    with open('.minigit/index', 'w') as f:
+        for l in lines:
+            f.write(l + '\n')
+
+
+def cmd_commit(message):
+    with open('.minigit/index', 'r') as f:
+        files = [l.strip() for l in f if l.strip()]
+    if not files:
+        print("Nothing to commit")
+        sys.exit(1)
+    with open('.minigit/HEAD', 'r') as f:
+        parent = f.read().strip()
+    parent_str = parent if parent else 'NONE'
+    timestamp = int(os.path.getmtime('.minigit/index')) if False else int(__import__('time').time())
+    # Build file entries sorted
+    file_entries = []
+    for fn in sorted(files):
+        with open(fn, 'rb') as f:
+            data = f.read()
+        h = minihash(data)
+        file_entries.append(f"{fn} {h}")
+    content = f"parent: {parent_str}\ntimestamp: {timestamp}\nmessage: {message}\nfiles:\n"
+    for entry in file_entries:
+        content += entry + '\n'
+    commit_hash = minihash(content.encode())
+    with open(os.path.join('.minigit/commits', commit_hash), 'w') as f:
+        f.write(content)
+    with open('.minigit/HEAD', 'w') as f:
+        f.write(commit_hash)
+    with open('.minigit/index', 'w') as f:
+        pass
+    print(f"Committed {commit_hash}")
+
+
+def cmd_log():
+    with open('.minigit/HEAD', 'r') as f:
+        current = f.read().strip()
+    if not current:
+        print("No commits")
+        return
+    first = True
+    while current:
+        if not first:
+            print()
+        first = False
+        with open(os.path.join('.minigit/commits', current), 'r') as f:
+            lines = f.readlines()
+        # Parse commit
+        parent = None
+        timestamp = None
+        message = None
+        for line in lines:
+            if line.startswith('parent: '):
+                parent = line[len('parent: '):].strip()
+            elif line.startswith('timestamp: '):
+                timestamp = line[len('timestamp: '):].strip()
+            elif line.startswith('message: '):
+                message = line[len('message: '):].strip()
+        print(f"commit {current}")
+        print(f"Date: {timestamp}")
+        print(f"Message: {message}")
+        if parent == 'NONE':
+            break
+        current = parent
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: minigit <command>")
+        sys.exit(1)
+    cmd = sys.argv[1]
+    if cmd == 'init':
+        cmd_init()
+    elif cmd == 'add':
+        if len(sys.argv) < 3:
+            print("Usage: minigit add <file>")
+            sys.exit(1)
+        cmd_add(sys.argv[2])
+    elif cmd == 'commit':
+        if len(sys.argv) < 4 or sys.argv[2] != '-m':
+            print("Usage: minigit commit -m \"<message>\"")
+            sys.exit(1)
+        cmd_commit(sys.argv[3])
+    elif cmd == 'log':
+        cmd_log()
+    else:
+        print(f"Unknown command: {cmd}")
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

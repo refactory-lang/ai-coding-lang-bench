@@ -1,0 +1,113 @@
+#!/usr/bin/env ruby
+
+def minihash(data)
+  h = 1469598103934665603
+  data.each_byte do |b|
+    h ^= b
+    h = (h * 1099511628211) % (2**64)
+  end
+  format('%016x', h)
+end
+
+def cmd_init
+  if Dir.exist?('.minigit')
+    puts 'Repository already initialized'
+    return
+  end
+  Dir.mkdir('.minigit')
+  Dir.mkdir('.minigit/objects')
+  Dir.mkdir('.minigit/commits')
+  File.write('.minigit/index', '')
+  File.write('.minigit/HEAD', '')
+end
+
+def cmd_add(filename)
+  unless File.exist?(filename)
+    puts 'File not found'
+    exit 1
+  end
+  content = File.binread(filename)
+  hash = minihash(content)
+  File.binwrite(".minigit/objects/#{hash}", content)
+  index = File.read('.minigit/index')
+  lines = index.split("\n").reject(&:empty?)
+  unless lines.include?(filename)
+    lines << filename
+    File.write('.minigit/index', lines.join("\n") + "\n")
+  end
+end
+
+def cmd_commit(message)
+  index = File.read('.minigit/index')
+  files = index.split("\n").reject(&:empty?)
+  if files.empty?
+    puts 'Nothing to commit'
+    exit 1
+  end
+
+  head = File.read('.minigit/HEAD').strip
+  parent = head.empty? ? 'NONE' : head
+  timestamp = Time.now.to_i
+
+  sorted_files = files.sort
+  file_entries = sorted_files.map do |f|
+    content = File.binread(f)
+    hash = minihash(content)
+    "#{f} #{hash}"
+  end
+
+  commit_content = "parent: #{parent}\ntimestamp: #{timestamp}\nmessage: #{message}\nfiles:\n#{file_entries.join("\n")}\n"
+
+  commit_hash = minihash(commit_content.b)
+  File.write(".minigit/commits/#{commit_hash}", commit_content)
+  File.write('.minigit/HEAD', commit_hash)
+  File.write('.minigit/index', '')
+  puts "Committed #{commit_hash}"
+end
+
+def cmd_log
+  head = File.read('.minigit/HEAD').strip
+  if head.empty?
+    puts 'No commits'
+    return
+  end
+
+  current = head
+  first = true
+  while current && current != 'NONE' && !current.empty?
+    path = ".minigit/commits/#{current}"
+    break unless File.exist?(path)
+    content = File.read(path)
+    parent = nil
+    timestamp = nil
+    message = nil
+    content.each_line do |line|
+      if line.start_with?('parent: ')
+        parent = line.sub('parent: ', '').strip
+      elsif line.start_with?('timestamp: ')
+        timestamp = line.sub('timestamp: ', '').strip
+      elsif line.start_with?('message: ')
+        message = line.sub('message: ', '').strip
+      end
+    end
+    puts '' unless first
+    puts "commit #{current}"
+    puts "Date: #{timestamp}"
+    puts "Message: #{message}"
+    first = false
+    current = parent
+  end
+end
+
+case ARGV[0]
+when 'init'
+  cmd_init
+when 'add'
+  cmd_add(ARGV[1])
+when 'commit'
+  if ARGV[1] == '-m'
+    cmd_commit(ARGV[2])
+  end
+when 'log'
+  cmd_log
+end

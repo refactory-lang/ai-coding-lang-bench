@@ -1,0 +1,25 @@
+module MiniGit
+  MINIGIT_DIR: String
+  OBJECTS_DIR: String
+  COMMITS_DIR: String
+  INDEX_FILE: String
+  HEAD_FILE: String
+
+  FNV_OFFSET: Integer
+  FNV_PRIME: Integer
+  MOD64: Integer
+
+  def self.minihash: (String data) -> String
+
+  def self.cmd_init: () -> void
+
+  def self.cmd_add: (String filename) -> void
+
+  def self.cmd_commit: (String message) -> void
+
+  def self.cmd_log: () -> void
+
+  def self.read_index: () -> Array[String]
+
+  def self.run: (Array[String] args) -> void
+end

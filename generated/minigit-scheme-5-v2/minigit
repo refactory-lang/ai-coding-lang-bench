@@ -1,0 +1,325 @@
+#!/usr/bin/env guile
+!#
+(use-modules (ice-9 format)
+             (ice-9 rdelim)
+             (ice-9 regex)
+             (srfi srfi-1)
+             (rnrs bytevectors)
+             (rnrs io ports))
+
+;;; MiniHash: FNV-1a variant, 64-bit, 16-char hex
+(define (minihash bv)
+  (let ((len (bytevector-length bv)))
+    (let loop ((i 0) (h 1469598103934665603))
+      (if (>= i len)
+          (format #f "~16,'0x" h)
+          (let* ((b (bytevector-u8-ref bv i))
+                 (h1 (logxor h b))
+                 (h2 (modulo (* h1 1099511628211) (expt 2 64))))
+            (loop (+ i 1) h2))))))
+
+(define (minihash-file filename)
+  (let* ((port (open-file filename "rb"))
+         (data (get-bytevector-all port)))
+    (close-port port)
+    (if (eof-object? data)
+        (minihash (make-bytevector 0))
+        (minihash data))))
+
+;;; File helpers
+(define (file-exists? f)
+  (access? f F_OK))
+
+(define (read-file-string filename)
+  (let* ((port (open-input-file filename))
+         (content (get-string-all port)))
+    (close-port port)
+    content))
+
+(define (write-file-string filename content)
+  (let ((port (open-output-file filename)))
+    (display content port)
+    (close-port port)))
+
+(define (read-lines filename)
+  (if (not (file-exists? filename))
+      '()
+      (let ((content (read-file-string filename)))
+        (if (string=? content "")
+            '()
+            (filter (lambda (s) (not (string=? s "")))
+                    (string-split content #\newline))))))
+
+(define (copy-file-binary src dst)
+  (let* ((in (open-file src "rb"))
+         (data (get-bytevector-all in)))
+    (close-port in)
+    (let ((out (open-file dst "wb")))
+      (unless (eof-object? data)
+        (put-bytevector out data))
+      (close-port out))))
+
+;;; Commands
+
+(define (cmd-init)
+  (if (file-exists? ".minigit")
+      (display "Repository already initialized\n")
+      (begin
+        (mkdir ".minigit")
+        (mkdir ".minigit/objects")
+        (mkdir ".minigit/commits")
+        (write-file-string ".minigit/index" "")
+        (write-file-string ".minigit/HEAD" ""))))
+
+(define (cmd-add filename)
+  (if (not (file-exists? filename))
+      (begin
+        (display "File not found\n")
+        (exit 1))
+      (let ((hash (minihash-file filename)))
+        ;; Store blob
+        (let ((objpath (string-append ".minigit/objects/" hash)))
+          (unless (file-exists? objpath)
+            (copy-file-binary filename objpath)))
+        ;; Update index
+        (let ((lines (read-lines ".minigit/index")))
+          (unless (member filename lines)
+            (let ((port (open-file ".minigit/index" "a")))
+              (display filename port)
+              (newline port)
+              (close-port port)))))))
+
+(define (cmd-commit message)
+  (let ((index-lines (read-lines ".minigit/index")))
+    (if (null? index-lines)
+        (begin
+          (display "Nothing to commit\n")
+          (exit 1))
+        (let* ((head-content (string-trim-both (read-file-string ".minigit/HEAD")))
+               (parent (if (string=? head-content "") "NONE" head-content))
+               (timestamp (number->string (current-time)))
+               (sorted-files (sort index-lines string<?))
+               ;; Build file entries with hashes
+               (file-entries
+                (map (lambda (fname)
+                       (let ((hash (minihash-file fname)))
+                         (string-append fname " " hash)))
+                     sorted-files))
+               ;; Build commit content
+               (commit-content
+                (string-append
+                 "parent: " parent "\n"
+                 "timestamp: " timestamp "\n"
+                 "message: " message "\n"
+                 "files:\n"
+                 (string-join file-entries "\n")
+                 "\n"))
+               ;; Hash the commit content
+               (commit-hash (minihash (string->utf8 commit-content))))
+          ;; Write commit file
+          (write-file-string (string-append ".minigit/commits/" commit-hash) commit-content)
+          ;; Update HEAD
+          (write-file-string ".minigit/HEAD" commit-hash)
+          ;; Clear index
+          (write-file-string ".minigit/index" "")
+          ;; Print
+          (format #t "Committed ~a\n" commit-hash)))))
+
+(define (cmd-log)
+  (let ((head-content (string-trim-both (read-file-string ".minigit/HEAD"))))
+    (if (string=? head-content "")
+        (display "No commits\n")
+        (let loop ((hash head-content) (first #t))
+          (when (and (not (string=? hash "NONE")) (not (string=? hash "")))
+            (let* ((commit-file (string-append ".minigit/commits/" hash))
+                   (content (read-file-string commit-file))
+                   (lines (string-split content #\newline)))
+              ;; Parse parent, timestamp, message
+              (let ((parent "NONE")
+                    (timestamp "")
+                    (message ""))
+                (for-each
+                 (lambda (line)
+                   (cond
+                    ((string-prefix? "parent: " line)
+                     (set! parent (substring line 8)))
+                    ((string-prefix? "timestamp: " line)
+                     (set! timestamp (substring line 11)))
+                    ((string-prefix? "message: " line)
+                     (set! message (substring line 9)))))
+                 lines)
+                (unless first (newline))
+                (format #t "commit ~a\n" hash)
+                (format #t "Date: ~a\n" timestamp)
+                (format #t "Message: ~a\n" message)
+                (loop parent #f))))))))
+
+(define (cmd-status)
+  (let ((lines (read-lines ".minigit/index")))
+    (display "Staged files:\n")
+    (if (null? lines)
+        (display "(none)\n")
+        (for-each (lambda (f) (format #t "~a\n" f)) lines))))
+
+(define (parse-commit-file commit-hash)
+  ;; Returns an alist with parent, timestamp, message, and files (list of (name . hash))
+  (let* ((path (string-append ".minigit/commits/" commit-hash))
+         (content (read-file-string path))
+         (lines (string-split content #\newline))
+         (parent "NONE")
+         (timestamp "")
+         (message "")
+         (files '())
+         (in-files #f))
+    (for-each
+     (lambda (line)
+       (cond
+        ((string-prefix? "parent: " line)
+         (set! parent (substring line 8)))
+        ((string-prefix? "timestamp: " line)
+         (set! timestamp (substring line 11)))
+        ((string-prefix? "message: " line)
+         (set! message (substring line 9)))
+        ((string=? line "files:")
+         (set! in-files #t))
+        (in-files
+         (when (not (string=? line ""))
+           (let ((parts (string-split line #\space)))
+             (when (>= (length parts) 2)
+               (set! files (append files (list (cons (car parts) (cadr parts)))))))))))
+     lines)
+    (list (cons 'parent parent)
+          (cons 'timestamp timestamp)
+          (cons 'message message)
+          (cons 'files files))))
+
+(define (cmd-diff hash1 hash2)
+  (let ((path1 (string-append ".minigit/commits/" hash1))
+        (path2 (string-append ".minigit/commits/" hash2)))
+    (when (or (not (file-exists? path1)) (not (file-exists? path2)))
+      (display "Invalid commit\n")
+      (exit 1))
+    (let* ((c1 (parse-commit-file hash1))
+           (c2 (parse-commit-file hash2))
+           (files1 (cdr (assq 'files c1)))
+           (files2 (cdr (assq 'files c2)))
+           ;; Collect all filenames, sorted
+           (all-names (sort (delete-duplicates
+                            (append (map car files1) (map car files2)))
+                           string<?)))
+      (for-each
+       (lambda (name)
+         (let ((in1 (assoc name files1))
+               (in2 (assoc name files2)))
+           (cond
+            ((and (not in1) in2)
+             (format #t "Added: ~a\n" name))
+            ((and in1 (not in2))
+             (format #t "Removed: ~a\n" name))
+            ((and in1 in2 (not (string=? (cdr in1) (cdr in2))))
+             (format #t "Modified: ~a\n" name)))))
+       all-names))))
+
+(define (cmd-checkout commit-hash)
+  (let ((path (string-append ".minigit/commits/" commit-hash)))
+    (when (not (file-exists? path))
+      (display "Invalid commit\n")
+      (exit 1))
+    (let* ((c (parse-commit-file commit-hash))
+           (files (cdr (assq 'files c))))
+      ;; Restore each file from objects
+      (for-each
+       (lambda (entry)
+         (let ((fname (car entry))
+               (bhash (cdr entry)))
+           (copy-file-binary (string-append ".minigit/objects/" bhash) fname)))
+       files)
+      ;; Update HEAD
+      (write-file-string ".minigit/HEAD" commit-hash)
+      ;; Clear index
+      (write-file-string ".minigit/index" "")
+      (format #t "Checked out ~a\n" commit-hash))))
+
+(define (cmd-reset commit-hash)
+  (let ((path (string-append ".minigit/commits/" commit-hash)))
+    (when (not (file-exists? path))
+      (display "Invalid commit\n")
+      (exit 1))
+    ;; Update HEAD
+    (write-file-string ".minigit/HEAD" commit-hash)
+    ;; Clear index
+    (write-file-string ".minigit/index" "")
+    (format #t "Reset to ~a\n" commit-hash)))
+
+(define (cmd-rm filename)
+  (let ((lines (read-lines ".minigit/index")))
+    (if (not (member filename lines))
+        (begin
+          (display "File not in index\n")
+          (exit 1))
+        (let ((new-lines (filter (lambda (f) (not (string=? f filename))) lines)))
+          (write-file-string ".minigit/index"
+                             (if (null? new-lines)
+                                 ""
+                                 (string-append (string-join new-lines "\n") "\n")))))))
+
+(define (cmd-show commit-hash)
+  (let ((path (string-append ".minigit/commits/" commit-hash)))
+    (when (not (file-exists? path))
+      (display "Invalid commit\n")
+      (exit 1))
+    (let* ((c (parse-commit-file commit-hash))
+           (timestamp (cdr (assq 'timestamp c)))
+           (message (cdr (assq 'message c)))
+           (files (cdr (assq 'files c))))
+      (format #t "commit ~a\n" commit-hash)
+      (format #t "Date: ~a\n" timestamp)
+      (format #t "Message: ~a\n" message)
+      (display "Files:\n")
+      (for-each
+       (lambda (entry)
+         (format #t "  ~a ~a\n" (car entry) (cdr entry)))
+       (sort files (lambda (a b) (string<? (car a) (car b))))))))
+
+;;; Main
+(let ((args (cdr (command-line))))
+  (if (null? args)
+      (begin
+        (display "Usage: minigit <command>\n")
+        (exit 1))
+      (let ((cmd (car args)))
+        (cond
+         ((string=? cmd "init") (cmd-init))
+         ((string=? cmd "add")
+          (if (< (length args) 2)
+              (begin (display "Usage: minigit add <file>\n") (exit 1))
+              (cmd-add (cadr args))))
+         ((string=? cmd "commit")
+          (if (< (length args) 3)
+              (begin (display "Usage: minigit commit -m <message>\n") (exit 1))
+              (cmd-commit (caddr args))))
+         ((string=? cmd "status") (cmd-status))
+         ((string=? cmd "log") (cmd-log))
+         ((string=? cmd "diff")
+          (if (< (length args) 3)
+              (begin (display "Usage: minigit diff <commit1> <commit2>\n") (exit 1))
+              (cmd-diff (cadr args) (caddr args))))
+         ((string=? cmd "checkout")
+          (if (< (length args) 2)
+              (begin (display "Usage: minigit checkout <commit_hash>\n") (exit 1))
+              (cmd-checkout (cadr args))))
+         ((string=? cmd "reset")
+          (if (< (length args) 2)
+              (begin (display "Usage: minigit reset <commit_hash>\n") (exit 1))
+              (cmd-reset (cadr args))))
+         ((string=? cmd "rm")
+          (if (< (length args) 2)
+              (begin (display "Usage: minigit rm <file>\n") (exit 1))
+              (cmd-rm (cadr args))))
+         ((string=? cmd "show")
+          (if (< (length args) 2)
+              (begin (display "Usage: minigit show <commit_hash>\n") (exit 1))
+              (cmd-show (cadr args))))
+         (else
+          (format #t "Unknown command: ~a\n" cmd)
+          (exit 1))))))

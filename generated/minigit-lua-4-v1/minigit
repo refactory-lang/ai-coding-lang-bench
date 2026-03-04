@@ -1,0 +1,239 @@
+#!/usr/bin/env lua
+
+-- MiniGit v1 implementation in Lua
+
+local function mkdir_p(path)
+    os.execute("mkdir -p " .. path)
+end
+
+local function file_exists(path)
+    local f = io.open(path, "r")
+    if f then f:close() return true end
+    return false
+end
+
+local function dir_exists(path)
+    local ok, _, code = os.execute("test -d " .. path)
+    if ok == true then return true end
+    if type(ok) == "number" then return ok == 0 end
+    return false
+end
+
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local content = f:read("*a")
+    f:close()
+    return content
+end
+
+local function write_file(path, content)
+    local f = io.open(path, "wb")
+    if not f then return false end
+    f:write(content)
+    f:close()
+    return true
+end
+
+local function minihash(data)
+    local h = 1469598103934665603
+    for i = 1, #data do
+        h = h ~ string.byte(data, i)
+        h = h * 1099511628211
+    end
+    return string.format("%016x", h)
+end
+
+local function get_index()
+    local content = read_file(".minigit/index")
+    if not content or content == "" then return {} end
+    local files = {}
+    for line in content:gmatch("[^\n]+") do
+        if line ~= "" then
+            files[#files + 1] = line
+        end
+    end
+    return files
+end
+
+local function write_index(files)
+    if #files == 0 then
+        write_file(".minigit/index", "")
+    else
+        write_file(".minigit/index", table.concat(files, "\n") .. "\n")
+    end
+end
+
+local function get_head()
+    local content = read_file(".minigit/HEAD")
+    if not content then return nil end
+    content = content:match("^%s*(.-)%s*$")  -- trim
+    if content == "" then return nil end
+    return content
+end
+
+-- Commands
+
+local function cmd_init()
+    if dir_exists(".minigit") then
+        print("Repository already initialized")
+        return 0
+    end
+    mkdir_p(".minigit/objects")
+    mkdir_p(".minigit/commits")
+    write_file(".minigit/index", "")
+    write_file(".minigit/HEAD", "")
+    return 0
+end
+
+local function cmd_add(filename)
+    if not filename then
+        io.stderr:write("Usage: minigit add <file>\n")
+        os.exit(1)
+    end
+
+    if not file_exists(filename) then
+        print("File not found")
+        os.exit(1)
+    end
+
+    local content = read_file(filename)
+    local hash = minihash(content)
+
+    -- Store blob
+    write_file(".minigit/objects/" .. hash, content)
+
+    -- Update index
+    local files = get_index()
+    local found = false
+    for _, f in ipairs(files) do
+        if f == filename then found = true; break end
+    end
+    if not found then
+        files[#files + 1] = filename
+        write_index(files)
+    end
+
+    return 0
+end
+
+local function cmd_commit(args)
+    -- Parse -m "message"
+    local message = nil
+    for i = 1, #args do
+        if args[i] == "-m" and args[i+1] then
+            message = args[i+1]
+            break
+        end
+    end
+
+    if not message then
+        io.stderr:write("Usage: minigit commit -m \"<message>\"\n")
+        os.exit(1)
+    end
+
+    local files = get_index()
+    if #files == 0 then
+        print("Nothing to commit")
+        os.exit(1)
+    end
+
+    -- Sort filenames
+    table.sort(files)
+
+    -- Get parent
+    local parent = get_head() or "NONE"
+
+    -- Get timestamp
+    local timestamp = tostring(os.time())
+
+    -- Build file entries
+    local file_entries = {}
+    for _, fname in ipairs(files) do
+        local content = read_file(fname)
+        if content then
+            local hash = minihash(content)
+            file_entries[#file_entries + 1] = fname .. " " .. hash
+        end
+    end
+
+    -- Build commit content
+    local commit_content = "parent: " .. parent .. "\n"
+        .. "timestamp: " .. timestamp .. "\n"
+        .. "message: " .. message .. "\n"
+        .. "files:\n"
+        .. table.concat(file_entries, "\n") .. "\n"
+
+    local commit_hash = minihash(commit_content)
+
+    -- Write commit
+    write_file(".minigit/commits/" .. commit_hash, commit_content)
+
+    -- Update HEAD
+    write_file(".minigit/HEAD", commit_hash)
+
+    -- Clear index
+    write_file(".minigit/index", "")
+
+    print("Committed " .. commit_hash)
+    return 0
+end
+
+local function cmd_log()
+    local head = get_head()
+    if not head then
+        print("No commits")
+        return 0
+    end
+
+    local current = head
+    local first = true
+    while current and current ~= "NONE" do
+        local content = read_file(".minigit/commits/" .. current)
+        if not content then break end
+
+        -- Parse commit
+        local parent_hash = content:match("parent: ([^\n]+)")
+        local timestamp = content:match("timestamp: ([^\n]+)")
+        local msg = content:match("message: ([^\n]+)")
+
+        if not first then
+            print("")
+        end
+        first = false
+
+        print("commit " .. current)
+        print("Date: " .. timestamp)
+        print("Message: " .. msg)
+
+        current = parent_hash
+    end
+
+    return 0
+end
+
+-- Main
+local args = arg
+if #args < 1 then
+    io.stderr:write("Usage: minigit <command> [args]\n")
+    os.exit(1)
+end
+
+local command = args[1]
+
+if command == "init" then
+    os.exit(cmd_init())
+elseif command == "add" then
+    os.exit(cmd_add(args[2]))
+elseif command == "commit" then
+    local commit_args = {}
+    for i = 2, #args do
+        commit_args[#commit_args + 1] = args[i]
+    end
+    os.exit(cmd_commit(commit_args))
+elseif command == "log" then
+    os.exit(cmd_log())
+else
+    io.stderr:write("Unknown command: " .. command .. "\n")
+    os.exit(1)
+end

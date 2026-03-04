@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""MiniGit executable wrapper."""
+
+from minigit import main
+
+main()

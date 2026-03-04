@@ -1,0 +1,410 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use File::Basename;
+use Cwd qw(getcwd);
+
+my $MINIGIT_DIR = '.minigit';
+my $OBJECTS_DIR = "$MINIGIT_DIR/objects";
+my $COMMITS_DIR = "$MINIGIT_DIR/commits";
+my $INDEX_FILE  = "$MINIGIT_DIR/index";
+my $HEAD_FILE   = "$MINIGIT_DIR/HEAD";
+
+sub minihash {
+    my ($data) = @_;
+    my $h = 1469598103934665603;
+    {
+        use integer;
+        for my $b (unpack('C*', $data)) {
+            $h ^= $b;
+            $h *= 1099511628211;
+        }
+    }
+    # Convert signed to unsigned for formatting
+    no warnings 'portable';
+    return sprintf('%016x', $h < 0 ? $h + 18446744073709551616 : $h);
+}
+
+sub cmd_init {
+    if (-d $MINIGIT_DIR) {
+        print "Repository already initialized\n";
+        return;
+    }
+    make_path($OBJECTS_DIR);
+    make_path($COMMITS_DIR);
+    open(my $fh, '>', $INDEX_FILE) or die "Cannot create index: $!\n";
+    close($fh);
+    open($fh, '>', $HEAD_FILE) or die "Cannot create HEAD: $!\n";
+    close($fh);
+}
+
+sub cmd_add {
+    my ($filename) = @_;
+    unless (defined $filename && -e $filename) {
+        print "File not found\n";
+        exit 1;
+    }
+
+    # Read file content
+    open(my $fh, '<:raw', $filename) or die "Cannot read $filename: $!\n";
+    my $content = do { local $/; <$fh> };
+    close($fh);
+
+    my $hash = minihash($content);
+
+    # Store blob
+    open($fh, '>:raw', "$OBJECTS_DIR/$hash") or die "Cannot write object: $!\n";
+    print $fh $content;
+    close($fh);
+
+    # Read current index
+    my @entries;
+    if (-f $INDEX_FILE) {
+        open($fh, '<', $INDEX_FILE) or die "Cannot read index: $!\n";
+        @entries = <$fh>;
+        chomp @entries;
+        close($fh);
+        @entries = grep { $_ ne '' } @entries;
+    }
+
+    # Add if not already present
+    unless (grep { $_ eq $filename } @entries) {
+        push @entries, $filename;
+    }
+
+    # Write index
+    open($fh, '>', $INDEX_FILE) or die "Cannot write index: $!\n";
+    print $fh "$_\n" for @entries;
+    close($fh);
+}
+
+sub cmd_commit {
+    my ($message) = @_;
+
+    # Read index
+    my @entries;
+    if (-f $INDEX_FILE) {
+        open(my $fh, '<', $INDEX_FILE) or die "Cannot read index: $!\n";
+        @entries = <$fh>;
+        chomp @entries;
+        close($fh);
+        @entries = grep { $_ ne '' } @entries;
+    }
+
+    if (!@entries) {
+        print "Nothing to commit\n";
+        exit 1;
+    }
+
+    # Read HEAD
+    my $parent = '';
+    if (-f $HEAD_FILE) {
+        open(my $fh, '<', $HEAD_FILE) or die "Cannot read HEAD: $!\n";
+        $parent = <$fh> // '';
+        chomp $parent;
+        close($fh);
+    }
+    $parent = 'NONE' if $parent eq '';
+
+    my $timestamp = time();
+
+    # Sort filenames
+    my @sorted = sort @entries;
+
+    # Build file list with blob hashes
+    my @file_lines;
+    for my $fname (@sorted) {
+        # Read the file and compute hash
+        open(my $fh, '<:raw', $fname) or die "Cannot read $fname: $!\n";
+        my $content = do { local $/; <$fh> };
+        close($fh);
+        my $hash = minihash($content);
+        push @file_lines, "$fname $hash";
+    }
+
+    # Build commit content
+    my $commit_content = "parent: $parent\n";
+    $commit_content .= "timestamp: $timestamp\n";
+    $commit_content .= "message: $message\n";
+    $commit_content .= "files:\n";
+    $commit_content .= join("\n", @file_lines) . "\n";
+
+    my $commit_hash = minihash($commit_content);
+
+    # Write commit file
+    open(my $fh, '>', "$COMMITS_DIR/$commit_hash") or die "Cannot write commit: $!\n";
+    print $fh $commit_content;
+    close($fh);
+
+    # Update HEAD
+    open($fh, '>', $HEAD_FILE) or die "Cannot write HEAD: $!\n";
+    print $fh $commit_hash;
+    close($fh);
+
+    # Clear index
+    open($fh, '>', $INDEX_FILE) or die "Cannot clear index: $!\n";
+    close($fh);
+
+    print "Committed $commit_hash\n";
+}
+
+sub cmd_log {
+    # Read HEAD
+    my $current = '';
+    if (-f $HEAD_FILE) {
+        open(my $fh, '<', $HEAD_FILE) or die "Cannot read HEAD: $!\n";
+        $current = <$fh> // '';
+        chomp $current;
+        close($fh);
+    }
+
+    if ($current eq '') {
+        print "No commits\n";
+        return;
+    }
+
+    my $first = 1;
+    while ($current ne '' && $current ne 'NONE') {
+        my $commit_file = "$COMMITS_DIR/$current";
+        last unless -f $commit_file;
+
+        open(my $fh, '<', $commit_file) or die "Cannot read commit: $!\n";
+        my @lines = <$fh>;
+        chomp @lines;
+        close($fh);
+
+        my ($parent, $timestamp, $message);
+        for my $line (@lines) {
+            if ($line =~ /^parent: (.*)$/) {
+                $parent = $1;
+            } elsif ($line =~ /^timestamp: (.*)$/) {
+                $timestamp = $1;
+            } elsif ($line =~ /^message: (.*)$/) {
+                $message = $1;
+            }
+        }
+
+        print "\n" unless $first;
+        print "commit $current\n";
+        print "Date: $timestamp\n";
+        print "Message: $message\n";
+
+        $first = 0;
+        $current = ($parent eq 'NONE') ? '' : $parent;
+    }
+}
+
+sub cmd_status {
+    my @entries;
+    if (-f $INDEX_FILE) {
+        open(my $fh, '<', $INDEX_FILE) or die "Cannot read index: $!\n";
+        @entries = <$fh>;
+        chomp @entries;
+        close($fh);
+        @entries = grep { $_ ne '' } @entries;
+    }
+
+    print "Staged files:\n";
+    if (@entries) {
+        print "$_\n" for @entries;
+    } else {
+        print "(none)\n";
+    }
+}
+
+sub parse_commit {
+    my ($hash) = @_;
+    my $commit_file = "$COMMITS_DIR/$hash";
+    unless (-f $commit_file) {
+        return undef;
+    }
+    open(my $fh, '<', $commit_file) or die "Cannot read commit: $!\n";
+    my @lines = <$fh>;
+    chomp @lines;
+    close($fh);
+
+    my %info;
+    my $in_files = 0;
+    my %files;
+    for my $line (@lines) {
+        if ($in_files) {
+            if ($line =~ /^(\S+)\s+(\S+)$/) {
+                $files{$1} = $2;
+            }
+        } elsif ($line =~ /^parent: (.*)$/) {
+            $info{parent} = $1;
+        } elsif ($line =~ /^timestamp: (.*)$/) {
+            $info{timestamp} = $1;
+        } elsif ($line =~ /^message: (.*)$/) {
+            $info{message} = $1;
+        } elsif ($line eq 'files:') {
+            $in_files = 1;
+        }
+    }
+    $info{files} = \%files;
+    return \%info;
+}
+
+sub cmd_diff {
+    my ($hash1, $hash2) = @_;
+    my $c1 = parse_commit($hash1);
+    unless ($c1) {
+        print "Invalid commit\n";
+        exit 1;
+    }
+    my $c2 = parse_commit($hash2);
+    unless ($c2) {
+        print "Invalid commit\n";
+        exit 1;
+    }
+
+    my %f1 = %{$c1->{files}};
+    my %f2 = %{$c2->{files}};
+
+    my %all;
+    $all{$_} = 1 for keys %f1;
+    $all{$_} = 1 for keys %f2;
+
+    for my $fname (sort keys %all) {
+        if (!exists $f1{$fname}) {
+            print "Added: $fname\n";
+        } elsif (!exists $f2{$fname}) {
+            print "Removed: $fname\n";
+        } elsif ($f1{$fname} ne $f2{$fname}) {
+            print "Modified: $fname\n";
+        }
+    }
+}
+
+sub cmd_checkout {
+    my ($hash) = @_;
+    my $c = parse_commit($hash);
+    unless ($c) {
+        print "Invalid commit\n";
+        exit 1;
+    }
+
+    my %files = %{$c->{files}};
+    for my $fname (sort keys %files) {
+        my $blob = "$OBJECTS_DIR/$files{$fname}";
+        open(my $in, '<:raw', $blob) or die "Cannot read blob: $!\n";
+        my $content = do { local $/; <$in> };
+        close($in);
+        open(my $out, '>:raw', $fname) or die "Cannot write $fname: $!\n";
+        print $out $content;
+        close($out);
+    }
+
+    # Update HEAD
+    open(my $fh, '>', $HEAD_FILE) or die "Cannot write HEAD: $!\n";
+    print $fh $hash;
+    close($fh);
+
+    # Clear index
+    open($fh, '>', $INDEX_FILE) or die "Cannot clear index: $!\n";
+    close($fh);
+
+    print "Checked out $hash\n";
+}
+
+sub cmd_reset {
+    my ($hash) = @_;
+    unless (-f "$COMMITS_DIR/$hash") {
+        print "Invalid commit\n";
+        exit 1;
+    }
+
+    # Update HEAD
+    open(my $fh, '>', $HEAD_FILE) or die "Cannot write HEAD: $!\n";
+    print $fh $hash;
+    close($fh);
+
+    # Clear index
+    open($fh, '>', $INDEX_FILE) or die "Cannot clear index: $!\n";
+    close($fh);
+
+    print "Reset to $hash\n";
+}
+
+sub cmd_rm {
+    my ($filename) = @_;
+    my @entries;
+    if (-f $INDEX_FILE) {
+        open(my $fh, '<', $INDEX_FILE) or die "Cannot read index: $!\n";
+        @entries = <$fh>;
+        chomp @entries;
+        close($fh);
+        @entries = grep { $_ ne '' } @entries;
+    }
+
+    unless (grep { $_ eq $filename } @entries) {
+        print "File not in index\n";
+        exit 1;
+    }
+
+    @entries = grep { $_ ne $filename } @entries;
+
+    open(my $fh, '>', $INDEX_FILE) or die "Cannot write index: $!\n";
+    print $fh "$_\n" for @entries;
+    close($fh);
+}
+
+sub cmd_show {
+    my ($hash) = @_;
+    my $c = parse_commit($hash);
+    unless ($c) {
+        print "Invalid commit\n";
+        exit 1;
+    }
+
+    print "commit $hash\n";
+    print "Date: $c->{timestamp}\n";
+    print "Message: $c->{message}\n";
+    print "Files:\n";
+    my %files = %{$c->{files}};
+    for my $fname (sort keys %files) {
+        print "  $fname $files{$fname}\n";
+    }
+}
+
+# Main
+my $cmd = shift @ARGV // '';
+
+if ($cmd eq 'init') {
+    cmd_init();
+} elsif ($cmd eq 'add') {
+    my $file = shift @ARGV;
+    cmd_add($file);
+} elsif ($cmd eq 'commit') {
+    my $flag = shift @ARGV // '';
+    my $message = shift @ARGV // '';
+    if ($flag ne '-m' || $message eq '') {
+        print "Usage: minigit commit -m \"<message>\"\n";
+        exit 1;
+    }
+    cmd_commit($message);
+} elsif ($cmd eq 'log') {
+    cmd_log();
+} elsif ($cmd eq 'status') {
+    cmd_status();
+} elsif ($cmd eq 'diff') {
+    my $h1 = shift @ARGV // '';
+    my $h2 = shift @ARGV // '';
+    cmd_diff($h1, $h2);
+} elsif ($cmd eq 'checkout') {
+    my $hash = shift @ARGV // '';
+    cmd_checkout($hash);
+} elsif ($cmd eq 'reset') {
+    my $hash = shift @ARGV // '';
+    cmd_reset($hash);
+} elsif ($cmd eq 'rm') {
+    my $file = shift @ARGV // '';
+    cmd_rm($file);
+} elsif ($cmd eq 'show') {
+    my $hash = shift @ARGV // '';
+    cmd_show($hash);
+} else {
+    print "Unknown command: $cmd\n";
+    exit 1;
+}

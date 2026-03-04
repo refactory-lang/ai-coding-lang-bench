@@ -1,0 +1,173 @@
+#!/usr/bin/env guile
+!#
+(use-modules (rnrs bytevectors)
+             (ice-9 binary-ports)
+             (ice-9 textual-ports)
+             (srfi srfi-1))
+
+;;; Constants
+(define MINIGIT-DIR ".minigit")
+(define OBJECTS-DIR (string-append MINIGIT-DIR "/objects"))
+(define COMMITS-DIR (string-append MINIGIT-DIR "/commits"))
+(define INDEX-FILE  (string-append MINIGIT-DIR "/index"))
+(define HEAD-FILE   (string-append MINIGIT-DIR "/HEAD"))
+
+(define MOD64      (expt 2 64))
+(define FNV-OFFSET 1469598103934665603)
+(define FNV-PRIME  1099511628211)
+
+;;; MiniHash: FNV-1a variant, 64-bit, 16-char hex output
+(define (minihash bv)
+  (let ((len (bytevector-length bv)))
+    (let loop ((i 0) (h FNV-OFFSET))
+      (if (>= i len)
+          (to-hex (modulo h MOD64))
+          (let* ((b (bytevector-u8-ref bv i))
+                 (h1 (logxor h b))
+                 (h2 (modulo (* h1 FNV-PRIME) MOD64)))
+            (loop (+ i 1) h2))))))
+
+(define (to-hex n)
+  (let ((hex-chars "0123456789abcdef")
+        (result (make-string 16 #\0)))
+    (let loop ((i 15) (val n))
+      (when (>= i 0)
+        (string-set! result i (string-ref hex-chars (modulo val 16)))
+        (loop (- i 1) (quotient val 16))))
+    result))
+
+;;; File I/O helpers
+(define (read-file-bytes filename)
+  (let* ((port (open-file filename "rb"))
+         (data (get-bytevector-all port)))
+    (close-port port)
+    (if (eof-object? data)
+        (make-bytevector 0)
+        data)))
+
+(define (write-file-bytes filename data)
+  (let ((port (open-file filename "wb")))
+    (put-bytevector port data)
+    (close-port port)))
+
+(define (read-file-text filename)
+  (if (file-exists? filename)
+      (let ((content (call-with-input-file filename get-string-all)))
+        (if (eof-object? content) "" content))
+      ""))
+
+(define (write-file-text filename content)
+  (call-with-output-file filename
+    (lambda (port) (display content port))))
+
+;;; Index helpers
+(define (read-index)
+  (let ((content (read-file-text INDEX-FILE)))
+    (if (string=? content "")
+        '()
+        (filter (lambda (s) (not (string=? s "")))
+                (string-split content #\newline)))))
+
+(define (write-index entries)
+  (if (null? entries)
+      (write-file-text INDEX-FILE "")
+      (write-file-text INDEX-FILE
+        (string-append (string-join entries "\n") "\n"))))
+
+;;; HEAD helpers
+(define (read-head)
+  (string-trim-right (read-file-text HEAD-FILE)))
+
+;;; Commands
+
+(define (cmd-init)
+  (if (file-exists? MINIGIT-DIR)
+      (display "Repository already initialized\n")
+      (begin
+        (mkdir MINIGIT-DIR)
+        (mkdir OBJECTS-DIR)
+        (mkdir COMMITS-DIR)
+        (write-file-text INDEX-FILE "")
+        (write-file-text HEAD-FILE ""))))
+
+(define (cmd-add filename)
+  (if (not (file-exists? filename))
+      (begin
+        (display "File not found\n")
+        (exit 1))
+      (let* ((data (read-file-bytes filename))
+             (hash (minihash data))
+             (blob-path (string-append OBJECTS-DIR "/" hash)))
+        (write-file-bytes blob-path data)
+        (let ((entries (read-index)))
+          (unless (member filename entries)
+            (write-index (append entries (list filename))))))))
+
+(define (cmd-commit message)
+  (let ((entries (read-index)))
+    (if (null? entries)
+        (begin
+          (display "Nothing to commit\n")
+          (exit 1))
+        (let* ((parent (read-head))
+               (timestamp (number->string (car (gettimeofday))))
+               (sorted-entries (sort entries string<?))
+               (file-hashes
+                (map (lambda (f)
+                       (cons f (minihash (read-file-bytes f))))
+                     sorted-entries))
+               (files-section
+                (string-join
+                 (map (lambda (fh)
+                        (string-append (car fh) " " (cdr fh)))
+                      file-hashes)
+                 "\n"))
+               (commit-text
+                (string-append
+                 "parent: " (if (string=? parent "") "NONE" parent) "\n"
+                 "timestamp: " timestamp "\n"
+                 "message: " message "\n"
+                 "files:\n"
+                 files-section "\n"))
+               (commit-hash (minihash (string->utf8 commit-text)))
+               (commit-path (string-append COMMITS-DIR "/" commit-hash)))
+          (write-file-text commit-path commit-text)
+          (write-file-text HEAD-FILE commit-hash)
+          (write-index '())
+          (display (string-append "Committed " commit-hash "\n"))))))
+
+(define (cmd-log)
+  (let ((head (read-head)))
+    (if (string=? head "")
+        (display "No commits\n")
+        (let loop ((hash head))
+          (let* ((content (read-file-text (string-append COMMITS-DIR "/" hash)))
+                 (lines (string-split content #\newline))
+                 (parent (substring (list-ref lines 0) 8))
+                 (timestamp (substring (list-ref lines 1) 11))
+                 (message (substring (list-ref lines 2) 9)))
+            (display (string-append "commit " hash "\n"))
+            (display (string-append "Date: " timestamp "\n"))
+            (display (string-append "Message: " message "\n"))
+            (newline)
+            (unless (string=? parent "NONE")
+              (loop parent)))))))
+
+;;; Main dispatch
+(let ((args (command-line)))
+  (if (< (length args) 2)
+      (begin (display "Usage: minigit <command>\n") (exit 1))
+      (let ((cmd (list-ref args 1)))
+        (cond
+         ((string=? cmd "init") (cmd-init))
+         ((string=? cmd "add")
+          (if (< (length args) 3)
+              (begin (display "Usage: minigit add <file>\n") (exit 1))
+              (cmd-add (list-ref args 2))))
+         ((string=? cmd "commit")
+          (if (and (>= (length args) 4)
+                   (string=? (list-ref args 2) "-m"))
+              (cmd-commit (list-ref args 3))
+              (begin (display "Usage: minigit commit -m \"<message>\"\n") (exit 1))))
+         ((string=? cmd "log") (cmd-log))
+         (else (display (string-append "Unknown command: " cmd "\n")) (exit 1))))))

@@ -1,0 +1,17 @@
+module MiniGit
+  MINIGIT_DIR: String
+  OBJECTS_DIR: String
+  COMMITS_DIR: String
+  INDEX_FILE: String
+  HEAD_FILE: String
+
+  def self.run: (Array[String]) -> void
+  def self.cmd_init: () -> void
+  def self.cmd_add: (String) -> void
+  def self.cmd_commit: (String) -> void
+  def self.cmd_log: () -> void
+  def self.minihash: (String) -> String
+  def self.read_index: () -> Array[String]
+  def self.write_index: (Array[String]) -> void
+  def self.read_head: () -> String
+end

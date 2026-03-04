@@ -1,0 +1,9 @@
+minigit: minigit.ml
+	ocamlfind ocamlopt -package unix -linkpkg -o minigit minigit.ml 2>/dev/null || \
+	ocamlfind ocamlopt -package unix -linkpkg -o minigit minigit.ml || \
+	ocamlopt -I +unix unix.cmxa -o minigit minigit.ml
+
+clean:
+	rm -f minigit *.cmi *.cmx *.o
+
+.PHONY: clean

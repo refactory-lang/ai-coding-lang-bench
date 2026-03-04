@@ -1,0 +1,191 @@
+#!/usr/bin/env guile
+!#
+(use-modules (ice-9 format)
+             (ice-9 rdelim)
+             (ice-9 textual-ports)
+             (ice-9 binary-ports)
+             (ice-9 match)
+             (rnrs bytevectors)
+             (srfi srfi-1))
+
+;;; MiniHash: FNV-1a variant, 64-bit, 16-char hex
+(define MOD64 (expt 2 64))
+
+(define (minihash bv)
+  (let loop ((i 0) (h 1469598103934665603))
+    (if (>= i (bytevector-length bv))
+        (format #f "~16,'0x" (modulo h MOD64))
+        (let* ((b (bytevector-u8-ref bv i))
+               (h2 (logxor h b))
+               (h3 (modulo (* h2 1099511628211) MOD64)))
+          (loop (+ i 1) h3)))))
+
+(define (minihash-string str)
+  (minihash (string->utf8 str)))
+
+;;; File helpers
+(define (file-exists? path)
+  (access? path F_OK))
+
+(define (directory-exists? path)
+  (and (file-exists? path)
+       (eq? 'directory (stat:type (stat path)))))
+
+(define (read-file-bytes path)
+  (call-with-input-file path
+    (lambda (port)
+      (get-bytevector-all port))
+    #:binary #t))
+
+(define (read-file-string path)
+  (call-with-input-file path
+    (lambda (port)
+      (get-string-all port))))
+
+(define (write-file-string path content)
+  (call-with-output-file path
+    (lambda (port)
+      (put-string port content))))
+
+(define (write-file-bytes path bv)
+  (call-with-output-file path
+    (lambda (port)
+      (put-bytevector port bv))
+    #:binary #t))
+
+(define (read-lines path)
+  (if (file-exists? path)
+      (let ((content (read-file-string path)))
+        (if (string=? content "")
+            '()
+            (filter (lambda (s) (not (string=? s "")))
+                    (string-split content #\newline))))
+      '()))
+
+(define (ensure-directory path)
+  (unless (directory-exists? path)
+    (mkdir path)))
+
+;;; Commands
+
+(define (cmd-init)
+  (if (directory-exists? ".minigit")
+      (display "Repository already initialized\n")
+      (begin
+        (ensure-directory ".minigit")
+        (ensure-directory ".minigit/objects")
+        (ensure-directory ".minigit/commits")
+        (write-file-string ".minigit/index" "")
+        (write-file-string ".minigit/HEAD" ""))))
+
+(define (cmd-add filename)
+  (unless (file-exists? filename)
+    (display "File not found\n")
+    (exit 1))
+  (let* ((bv (read-file-bytes filename))
+         (hash (minihash bv))
+         (obj-path (string-append ".minigit/objects/" hash)))
+    (unless (file-exists? obj-path)
+      (write-file-bytes obj-path bv))
+    ;; Add to index if not present
+    (let ((index (read-lines ".minigit/index")))
+      (unless (member filename index)
+        (call-with-output-file ".minigit/index"
+          (lambda (port)
+            (for-each (lambda (f) (format port "~a\n" f)) index)
+            (format port "~a\n" filename))))))
+  )
+
+(define (cmd-commit args)
+  ;; Parse -m "message"
+  (let ((message (parse-commit-message args)))
+    (let ((index (read-lines ".minigit/index")))
+      (when (null? index)
+        (display "Nothing to commit\n")
+        (exit 1))
+      (let* ((head-content (string-trim-both (read-file-string ".minigit/HEAD")))
+             (parent (if (string=? head-content "") "NONE" head-content))
+             (timestamp (number->string (current-time)))
+             (sorted-files (sort index string<?))
+             ;; Build file entries: filename blobhash
+             (file-entries
+              (map (lambda (f)
+                     (let* ((bv (read-file-bytes f))
+                            (hash (minihash bv)))
+                       (string-append f " " hash)))
+                   sorted-files))
+             (commit-content
+              (string-append
+               "parent: " parent "\n"
+               "timestamp: " timestamp "\n"
+               "message: " message "\n"
+               "files:\n"
+               (string-join file-entries "\n")
+               "\n"))
+             (commit-hash (minihash-string commit-content))
+             (commit-path (string-append ".minigit/commits/" commit-hash)))
+        (write-file-string commit-path commit-content)
+        (write-file-string ".minigit/HEAD" commit-hash)
+        (write-file-string ".minigit/index" "")
+        (format #t "Committed ~a\n" commit-hash)))))
+
+(define (parse-commit-message args)
+  ;; args is list of strings after "commit"
+  ;; expect "-m" "message"
+  (match args
+    (("-m" msg . _) msg)
+    (_ (display "Usage: minigit commit -m \"message\"\n")
+       (exit 1))))
+
+(define (cmd-log)
+  (let ((head-content (string-trim-both (read-file-string ".minigit/HEAD"))))
+    (if (string=? head-content "")
+        (display "No commits\n")
+        (log-traverse head-content))))
+
+(define (log-traverse hash)
+  (let* ((path (string-append ".minigit/commits/" hash))
+         (content (read-file-string path))
+         (lines (string-split content #\newline)))
+    ;; Parse parent, timestamp, message
+    (let ((parent (parse-field "parent: " lines))
+          (timestamp (parse-field "timestamp: " lines))
+          (message (parse-field "message: " lines)))
+      (format #t "commit ~a\n" hash)
+      (format #t "Date: ~a\n" timestamp)
+      (format #t "Message: ~a\n" message)
+      (unless (string=? parent "NONE")
+        (newline)
+        (log-traverse parent)))))
+
+(define (parse-field prefix lines)
+  (let loop ((ls lines))
+    (if (null? ls)
+        ""
+        (let ((line (car ls)))
+          (if (and (>= (string-length line) (string-length prefix))
+                   (string=? (substring line 0 (string-length prefix)) prefix))
+              (substring line (string-length prefix))
+              (loop (cdr ls)))))))
+
+;;; Main
+(define (main args)
+  (when (< (length args) 2)
+    (display "Usage: minigit <command>\n")
+    (exit 1))
+  (let ((cmd (list-ref args 1))
+        (rest (cddr args)))
+    (cond
+     ((string=? cmd "init") (cmd-init))
+     ((string=? cmd "add")
+      (when (null? rest)
+        (display "Usage: minigit add <file>\n")
+        (exit 1))
+      (cmd-add (car rest)))
+     ((string=? cmd "commit") (cmd-commit rest))
+     ((string=? cmd "log") (cmd-log))
+     (else
+      (format #t "Unknown command: ~a\n" cmd)
+      (exit 1)))))
+
+(main (command-line))

@@ -1,0 +1,3035 @@
+============================================================
+Claude Code Language Benchmark
+============================================================
+
+Claude Version: 2.1.66 (Claude Code)
+Languages: rust, go, c, typescript, javascript, java, perl, python, python/mypy, ruby, ruby/steep, lua, scheme, ocaml, haskell
+Trials: 10
+Dry run: false
+
+--- Language Versions ---
+  rust: rustc 1.93.1 (01f6ddf75 2026-02-11)
+  go: go version go1.23.6 linux/amd64
+  c: gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+  typescript: tsx v4.21.0
+  javascript: v18.19.1
+  java: openjdk 25.0.2 2026-01-20
+  perl: This is perl 5, version 38, subversion 2 (v5.38.2) built for x86_64-linux-gnu-thread-multi
+  python: Python 3.12.3
+  python/mypy: Python 3.12.3
+  ruby: ruby 4.0.1 (2026-01-13 revision e04267a14b) +PRISM [x86_64-linux]
+  ruby/steep: ruby 4.0.1 (2026-01-13 revision e04267a14b) +PRISM [x86_64-linux]
+  lua: Lua 5.4.6  Copyright (C) 1994-2023 Lua.org, PUC-Rio
+  scheme: guile (GNU Guile) 3.0.9
+  ocaml: The OCaml toplevel, version 4.14.1
+  haskell: The Glorious Glasgow Haskell Compilation System, version 9.4.7
+
+--- Warmup ---
+  Running Claude...
+  Warmup done in 3.0s (success=true)
+
+============================================================
+Trial 1/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-1-v1.json
+  Claude finished in 204.6s (success=true)
+  Running v1 tests...
+  Tests: 10/11 passed (FAIL)
+  LOC: 147
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-1-v2.json
+  Claude finished in 131.1s (success=true)
+  Running v2 tests...
+  Tests: 29/30 passed (FAIL)
+  LOC: 314
+
+============================================================
+Trial 1/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-1-v1.json
+  Claude finished in 190.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 147
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-1-v2.json
+  Claude finished in 54.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 332
+
+============================================================
+Trial 1/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-1-v1.json
+  Claude finished in 62.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 311
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-1-v2.json
+  Claude finished in 73.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 564
+
+============================================================
+Trial 1/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-1-v1.json
+  Claude finished in 72.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 118
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-1-v2.json
+  Claude finished in 65.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 248
+
+============================================================
+Trial 1/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-1-v1.json
+  Claude finished in 37.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 125
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-1-v2.json
+  Claude finished in 51.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 279
+
+============================================================
+Trial 1/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-1-v1.json
+  Claude finished in 122.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 153
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-1-v2.json
+  Claude finished in 68.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 309
+
+============================================================
+Trial 1/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-1-v1.json
+  Claude finished in 120.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 139
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-1-v2.json
+  Claude finished in 44.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 277
+
+============================================================
+Trial 1/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-1-v1.json
+  Claude finished in 33.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 112
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-1-v2.json
+  Claude finished in 40.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 236
+
+============================================================
+Trial 1/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-1-v1.json
+  Claude finished in 50.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 152
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-1-v2.json
+  Claude finished in 85.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 284
+
+============================================================
+Trial 1/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-1-v1.json
+  Claude finished in 36.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 118
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-1-v2.json
+  Claude finished in 39.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 239
+
+============================================================
+Trial 1/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-1-v1.json
+  Claude finished in 374.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 145
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-1-v2.json
+  Claude finished in 100.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 278
+
+============================================================
+Trial 1/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-1-v1.json
+  Claude finished in 56.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 223
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-1-v2.json
+  Claude finished in 50.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 393
+
+============================================================
+Trial 1/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-1-v1.json
+  Claude finished in 214.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 156
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-1-v2.json
+  Claude finished in 64.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 275
+
+============================================================
+Trial 1/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-1-v1.json
+  Claude finished in 118.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 119
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-1-v2.json
+  Claude finished in 46.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 218
+
+============================================================
+Trial 1/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-1-v1.json
+  Claude finished in 60.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 139
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-1-v2.json
+  Claude finished in 169.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 247
+
+============================================================
+Trial 2/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-2-v1.json
+  Claude finished in 52.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 146
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-2-v2.json
+  Claude finished in 73.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 320
+
+============================================================
+Trial 2/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-2-v1.json
+  Claude finished in 44.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 142
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-2-v2.json
+  Claude finished in 55.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 327
+
+============================================================
+Trial 2/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-2-v1.json
+  Claude finished in 75.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 282
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-2-v2.json
+  Claude finished in 78.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 540
+
+============================================================
+Trial 2/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-2-v1.json
+  Claude finished in 67.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 132
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-2-v2.json
+  Claude finished in 56.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 287
+
+============================================================
+Trial 2/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-2-v1.json
+  Claude finished in 37.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 135
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-2-v2.json
+  Claude finished in 54.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 304
+
+============================================================
+Trial 2/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-2-v1.json
+  Claude finished in 105.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 167
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-2-v2.json
+  Claude finished in 67.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 343
+
+============================================================
+Trial 2/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-2-v1.json
+  Claude finished in 143.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 144
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-2-v2.json
+  Claude finished in 42.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 283
+
+============================================================
+Trial 2/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-2-v1.json
+  Claude finished in 34.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 106
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-2-v2.json
+  Claude finished in 41.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 229
+
+============================================================
+Trial 2/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-2-v1.json
+  Claude finished in 51.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 158
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-2-v2.json
+  Claude finished in 68.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 288
+
+============================================================
+Trial 2/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-2-v1.json
+  Claude finished in 35.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 111
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-2-v2.json
+  Claude finished in 45.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 215
+
+============================================================
+Trial 2/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-2-v1.json
+  Claude finished in 110.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 154
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-2-v2.json
+  Claude finished in 89.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 324
+
+============================================================
+Trial 2/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-2-v1.json
+  Claude finished in 86.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 200
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-2-v2.json
+  Claude finished in 58.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 375
+
+============================================================
+Trial 2/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-2-v1.json
+  Claude finished in 76.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 192
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-2-v2.json
+  Claude finished in 71.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 332
+
+============================================================
+Trial 2/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-2-v1.json
+  Claude finished in 131.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 113
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-2-v2.json
+  Claude finished in 50.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 217
+
+============================================================
+Trial 2/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-2-v1.json
+  Claude finished in 92.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 112
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-2-v2.json
+  Claude finished in 116.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 214
+
+============================================================
+Trial 3/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-3-v1.json
+  Claude finished in 66.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 144
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-3-v2.json
+  Claude finished in 66.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 315
+
+============================================================
+Trial 3/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-3-v1.json
+  Claude finished in 67.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 154
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-3-v2.json
+  Claude finished in 55.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 329
+
+============================================================
+Trial 3/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-3-v1.json
+  Claude finished in 73.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 295
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-3-v2.json
+  Claude finished in 134.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 563
+
+============================================================
+Trial 3/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-3-v1.json
+  Claude finished in 137.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 126
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-3-v2.json
+  Claude finished in 74.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 262
+
+============================================================
+Trial 3/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-3-v1.json
+  Claude finished in 37.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 134
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-3-v2.json
+  Claude finished in 41.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 261
+
+============================================================
+Trial 3/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-3-v1.json
+  Claude finished in 55.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 166
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-3-v2.json
+  Claude finished in 50.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 323
+
+============================================================
+Trial 3/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-3-v1.json
+  Claude finished in 120.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 147
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-3-v2.json
+  Claude finished in 68.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 278
+
+============================================================
+Trial 3/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-3-v1.json
+  Claude finished in 33.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 118
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-3-v2.json
+  Claude finished in 46.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 240
+
+============================================================
+Trial 3/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-3-v1.json
+  Claude finished in 61.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 152
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-3-v2.json
+  Claude finished in 80.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 294
+
+============================================================
+Trial 3/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-3-v1.json
+  Claude finished in 34.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 124
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-3-v2.json
+  Claude finished in 38.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 248
+
+============================================================
+Trial 3/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-3-v1.json
+  Claude finished in 86.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 157
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-3-v2.json
+  Claude finished in 93.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 288
+
+============================================================
+Trial 3/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-3-v1.json
+  Claude finished in 189.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 166
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-3-v2.json
+  Claude finished in 45.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 328
+
+============================================================
+Trial 3/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-3-v1.json
+  Claude finished in 84.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 206
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-3-v2.json
+  Claude finished in 87.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 354
+
+============================================================
+Trial 3/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-3-v1.json
+  Claude finished in 158.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 131
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-3-v2.json
+  Claude finished in 50.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 261
+
+============================================================
+Trial 3/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-3-v1.json
+  Claude finished in 204.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 98
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-3-v2.json
+  Claude finished in 65.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 187
+
+============================================================
+Trial 4/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-4-v1.json
+  Claude finished in 53.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 143
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-4-v2.json
+  Claude finished in 61.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 314
+
+============================================================
+Trial 4/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-4-v1.json
+  Claude finished in 41.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 148
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-4-v2.json
+  Claude finished in 64.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 321
+
+============================================================
+Trial 4/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-4-v1.json
+  Claude finished in 134.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 330
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-4-v2.json
+  Claude finished in 80.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 604
+
+============================================================
+Trial 4/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-4-v1.json
+  Claude finished in 83.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 128
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-4-v2.json
+  Claude finished in 53.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 272
+
+============================================================
+Trial 4/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-4-v1.json
+  Claude finished in 49.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 119
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-4-v2.json
+  Claude finished in 41.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 242
+
+============================================================
+Trial 4/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-4-v1.json
+  Claude finished in 78.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 185
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-4-v2.json
+  Claude finished in 52.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 359
+
+============================================================
+Trial 4/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-4-v1.json
+  Claude finished in 57.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 190
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-4-v2.json
+  Claude finished in 37.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 338
+
+============================================================
+Trial 4/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-4-v1.json
+  Claude finished in 30.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 107
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-4-v2.json
+  Claude finished in 40.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 219
+
+============================================================
+Trial 4/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-4-v1.json
+  Claude finished in 44.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 161
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-4-v2.json
+  Claude finished in 46.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 308
+
+============================================================
+Trial 4/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-4-v1.json
+  Claude finished in 30.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 102
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-4-v2.json
+  Claude finished in 39.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 203
+
+============================================================
+Trial 4/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-4-v1.json
+  Claude finished in 103.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 146
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-4-v2.json
+  Claude finished in 80.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 288
+
+============================================================
+Trial 4/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-4-v1.json
+  Claude finished in 113.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 198
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-4-v2.json
+  Claude finished in 47.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 368
+
+============================================================
+Trial 4/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-4-v1.json
+  Claude finished in 53.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 170
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-4-v2.json
+  Claude finished in 43.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 301
+
+============================================================
+Trial 4/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-4-v1.json
+  Claude finished in 77.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 108
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-4-v2.json
+  Claude finished in 43.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 216
+
+============================================================
+Trial 4/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-4-v1.json
+  Claude finished in 68.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 125
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-4-v2.json
+  Claude finished in 90.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 235
+
+============================================================
+Trial 5/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-5-v1.json
+  Claude finished in 60.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 141
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-5-v2.json
+  Claude finished in 72.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 307
+
+============================================================
+Trial 5/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-5-v1.json
+  Claude finished in 37.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 141
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-5-v2.json
+  Claude finished in 54.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 323
+
+============================================================
+Trial 5/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-5-v1.json
+  Claude finished in 73.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 286
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-5-v2.json
+  Claude finished in 61.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 498
+
+============================================================
+Trial 5/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-5-v1.json
+  Claude finished in 54.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 113
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-5-v2.json
+  Claude finished in 58.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 230
+
+============================================================
+Trial 5/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-5-v1.json
+  Claude finished in 34.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 122
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-5-v2.json
+  Claude finished in 45.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 241
+
+============================================================
+Trial 5/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-5-v1.json
+  Claude finished in 54.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 137
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-5-v2.json
+  Claude finished in 44.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 281
+
+============================================================
+Trial 5/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-5-v1.json
+  Claude finished in 56.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 167
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-5-v2.json
+  Claude finished in 49.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 303
+
+============================================================
+Trial 5/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-5-v1.json
+  Claude finished in 32.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 108
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-5-v2.json
+  Claude finished in 43.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 227
+
+============================================================
+Trial 5/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-5-v1.json
+  Claude finished in 53.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 270
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-5-v2.json
+  Claude finished in 73.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 518
+
+============================================================
+Trial 5/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-5-v1.json
+  Claude finished in 33.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 99
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-5-v2.json
+  Claude finished in 43.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 201
+
+============================================================
+Trial 5/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-5-v1.json
+  Claude finished in 76.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 150
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-5-v2.json
+  Claude finished in 73.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 322
+
+============================================================
+Trial 5/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-5-v1.json
+  Claude finished in 87.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 188
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-5-v2.json
+  Claude finished in 58.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 386
+
+============================================================
+Trial 5/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-5-v1.json
+  Claude finished in 51.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 163
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-5-v2.json
+  Claude finished in 60.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 305
+
+============================================================
+Trial 5/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-5-v1.json
+  Claude finished in 77.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 108
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-5-v2.json
+  Claude finished in 49.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 221
+
+============================================================
+Trial 5/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-5-v1.json
+  Claude finished in 43.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 128
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-5-v2.json
+  Claude finished in 65.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 232
+
+============================================================
+Trial 6/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-6-v1.json
+  Claude finished in 37.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 134
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-6-v2.json
+  Claude finished in 50.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 296
+
+============================================================
+Trial 6/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-6-v1.json
+  Claude finished in 36.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 137
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-6-v2.json
+  Claude finished in 49.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 319
+
+============================================================
+Trial 6/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-6-v1.json
+  Claude finished in 61.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 254
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-6-v2.json
+  Claude finished in 80.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 514
+
+============================================================
+Trial 6/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-6-v1.json
+  Claude finished in 57.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 288
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-6-v2.json
+  Claude finished in 47.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 539
+
+============================================================
+Trial 6/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-6-v1.json
+  Claude finished in 35.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 123
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-6-v2.json
+  Claude finished in 48.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 240
+
+============================================================
+Trial 6/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-6-v1.json
+  Claude finished in 52.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 173
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-6-v2.json
+  Claude finished in 57.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 344
+
+============================================================
+Trial 6/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-6-v1.json
+  Claude finished in 75.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 161
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-6-v2.json
+  Claude finished in 42.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 290
+
+============================================================
+Trial 6/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-6-v1.json
+  Claude finished in 34.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 110
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-6-v2.json
+  Claude finished in 37.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 243
+
+============================================================
+Trial 6/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-6-v1.json
+  Claude finished in 65.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 147
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-6-v2.json
+  Claude finished in 63.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 297
+
+============================================================
+Trial 6/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-6-v1.json
+  Claude finished in 29.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 100
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-6-v2.json
+  Claude finished in 38.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 198
+
+============================================================
+Trial 6/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-6-v1.json
+  Claude finished in 118.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 151
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-6-v2.json
+  Claude finished in 70.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 299
+
+============================================================
+Trial 6/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-6-v1.json
+  Claude finished in 121.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 369
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-6-v2.json
+  Claude finished in 43.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 540
+
+============================================================
+Trial 6/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-6-v1.json
+  Claude finished in 49.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 178
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-6-v2.json
+  Claude finished in 63.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 314
+
+============================================================
+Trial 6/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-6-v1.json
+  Claude finished in 68.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 106
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-6-v2.json
+  Claude finished in 52.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 201
+
+============================================================
+Trial 6/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-6-v1.json
+  Claude finished in 57.0s (success=true)
+  Running v1 tests...
+  Tests: 0/0 passed (FAIL)
+  LOC: 106
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-6-v2.json
+  Claude finished in 113.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 215
+
+============================================================
+Trial 7/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-7-v1.json
+  Claude finished in 39.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 134
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-7-v2.json
+  Claude finished in 63.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 304
+
+============================================================
+Trial 7/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-7-v1.json
+  Claude finished in 36.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 135
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-7-v2.json
+  Claude finished in 47.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 309
+
+============================================================
+Trial 7/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-7-v1.json
+  Claude finished in 62.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 274
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-7-v2.json
+  Claude finished in 103.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 492
+
+============================================================
+Trial 7/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-7-v1.json
+  Claude finished in 56.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 126
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-7-v2.json
+  Claude finished in 69.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 262
+
+============================================================
+Trial 7/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-7-v1.json
+  Claude finished in 35.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 118
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-7-v2.json
+  Claude finished in 42.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 234
+
+============================================================
+Trial 7/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-7-v1.json
+  Claude finished in 50.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 130
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-7-v2.json
+  Claude finished in 43.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 260
+
+============================================================
+Trial 7/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-7-v1.json
+  Claude finished in 48.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 177
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-7-v2.json
+  Claude finished in 47.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 306
+
+============================================================
+Trial 7/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-7-v1.json
+  Claude finished in 33.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 110
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-7-v2.json
+  Claude finished in 36.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 230
+
+============================================================
+Trial 7/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-7-v1.json
+  Claude finished in 61.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 279
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-7-v2.json
+  Claude finished in 80.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 536
+
+============================================================
+Trial 7/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-7-v1.json
+  Claude finished in 32.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 98
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-7-v2.json
+  Claude finished in 40.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 217
+
+============================================================
+Trial 7/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-7-v1.json
+  Claude finished in 79.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 150
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-7-v2.json
+  Claude finished in 92.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 305
+
+============================================================
+Trial 7/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-7-v1.json
+  Claude finished in 82.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 213
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-7-v2.json
+  Claude finished in 46.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 382
+
+============================================================
+Trial 7/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-7-v1.json
+  Claude finished in 45.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 173
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-7-v2.json
+  Claude finished in 56.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 316
+
+============================================================
+Trial 7/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-7-v1.json
+  Claude finished in 63.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 107
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-7-v2.json
+  Claude finished in 43.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 210
+
+============================================================
+Trial 7/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-7-v1.json
+  Claude finished in 73.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 135
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-7-v2.json
+  Claude finished in 95.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 243
+
+============================================================
+Trial 8/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-8-v1.json
+  Claude finished in 38.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 135
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-8-v2.json
+  Claude finished in 47.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 293
+
+============================================================
+Trial 8/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-8-v1.json
+  Claude finished in 42.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 145
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-8-v2.json
+  Claude finished in 45.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 334
+
+============================================================
+Trial 8/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-8-v1.json
+  Claude finished in 54.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 293
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-8-v2.json
+  Claude finished in 73.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 573
+
+============================================================
+Trial 8/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-8-v1.json
+  Claude finished in 58.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 135
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-8-v2.json
+  Claude finished in 54.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 274
+
+============================================================
+Trial 8/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-8-v1.json
+  Claude finished in 33.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 119
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-8-v2.json
+  Claude finished in 45.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 247
+
+============================================================
+Trial 8/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-8-v1.json
+  Claude finished in 51.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 164
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-8-v2.json
+  Claude finished in 49.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 317
+
+============================================================
+Trial 8/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-8-v1.json
+  Claude finished in 42.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 183
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-8-v2.json
+  Claude finished in 43.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 339
+
+============================================================
+Trial 8/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-8-v1.json
+  Claude finished in 32.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 104
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-8-v2.json
+  Claude finished in 36.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 227
+
+============================================================
+Trial 8/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-8-v1.json
+  Claude finished in 42.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 137
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-8-v2.json
+  Claude finished in 68.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 259
+
+============================================================
+Trial 8/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-8-v1.json
+  Claude finished in 31.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 103
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-8-v2.json
+  Claude finished in 35.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 207
+
+============================================================
+Trial 8/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-8-v1.json
+  Claude finished in 103.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 147
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-8-v2.json
+  Claude finished in 70.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 284
+
+============================================================
+Trial 8/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-8-v1.json
+  Claude finished in 72.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 262
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-8-v2.json
+  Claude finished in 39.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 432
+
+============================================================
+Trial 8/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-8-v1.json
+  Claude finished in 45.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 164
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-8-v2.json
+  Claude finished in 57.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 309
+
+============================================================
+Trial 8/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-8-v1.json
+  Claude finished in 67.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 107
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-8-v2.json
+  Claude finished in 42.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 210
+
+============================================================
+Trial 8/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-8-v1.json
+  Claude finished in 70.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 123
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-8-v2.json
+  Claude finished in 54.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 213
+
+============================================================
+Trial 9/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-9-v1.json
+  Claude finished in 39.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 139
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-9-v2.json
+  Claude finished in 70.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 305
+
+============================================================
+Trial 9/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-9-v1.json
+  Claude finished in 36.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 138
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-9-v2.json
+  Claude finished in 59.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 320
+
+============================================================
+Trial 9/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-9-v1.json
+  Claude finished in 58.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 269
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-9-v2.json
+  Claude finished in 124.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 475
+
+============================================================
+Trial 9/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-9-v1.json
+  Claude finished in 59.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 253
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-9-v2.json
+  Claude finished in 56.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 550
+
+============================================================
+Trial 9/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-9-v1.json
+  Claude finished in 35.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 124
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-9-v2.json
+  Claude finished in 46.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 236
+
+============================================================
+Trial 9/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-9-v1.json
+  Claude finished in 61.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 155
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-9-v2.json
+  Claude finished in 44.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 305
+
+============================================================
+Trial 9/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-9-v1.json
+  Claude finished in 69.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 191
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-9-v2.json
+  Claude finished in 42.8s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 359
+
+============================================================
+Trial 9/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-9-v1.json
+  Claude finished in 32.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 104
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-9-v2.json
+  Claude finished in 42.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 223
+
+============================================================
+Trial 9/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-9-v1.json
+  Claude finished in 59.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 145
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-9-v2.json
+  Claude finished in 79.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 279
+
+============================================================
+Trial 9/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-9-v1.json
+  Claude finished in 33.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 98
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-9-v2.json
+  Claude finished in 38.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 211
+
+============================================================
+Trial 9/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-9-v1.json
+  Claude finished in 107.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 141
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-9-v2.json
+  Claude finished in 86.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 252
+
+============================================================
+Trial 9/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-9-v1.json
+  Claude finished in 50.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 231
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-9-v2.json
+  Claude finished in 41.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 411
+
+============================================================
+Trial 9/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-9-v1.json
+  Claude finished in 50.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 167
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-9-v2.json
+  Claude finished in 74.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 310
+
+============================================================
+Trial 9/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-9-v1.json
+  Claude finished in 72.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 105
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-9-v2.json
+  Claude finished in 42.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 210
+
+============================================================
+Trial 9/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-9-v1.json
+  Claude finished in 62.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 105
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-9-v2.json
+  Claude finished in 115.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 217
+
+============================================================
+Trial 10/10 - rust
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-10-v1.json
+  Claude finished in 41.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 144
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-rust-10-v2.json
+  Claude finished in 47.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 309
+
+============================================================
+Trial 10/10 - go
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-10-v1.json
+  Claude finished in 39.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 139
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-go-10-v2.json
+  Claude finished in 100.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 320
+
+============================================================
+Trial 10/10 - c
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-10-v1.json
+  Claude finished in 68.9s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 262
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-c-10-v2.json
+  Claude finished in 70.7s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 464
+
+============================================================
+Trial 10/10 - typescript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-10-v1.json
+  Claude finished in 92.0s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 122
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-typescript-10-v2.json
+  Claude finished in 119.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 255
+
+============================================================
+Trial 10/10 - javascript
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-10-v1.json
+  Claude finished in 36.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 124
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-javascript-10-v2.json
+  Claude finished in 46.1s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 247
+
+============================================================
+Trial 10/10 - java
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-10-v1.json
+  Claude finished in 39.8s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 142
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-java-10-v2.json
+  Claude finished in 59.5s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 291
+
+============================================================
+Trial 10/10 - perl
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-10-v1.json
+  Claude finished in 82.5s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 139
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-perl-10-v2.json
+  Claude finished in 54.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 268
+
+============================================================
+Trial 10/10 - python
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-10-v1.json
+  Claude finished in 32.6s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 107
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-10-v2.json
+  Claude finished in 52.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 216
+
+============================================================
+Trial 10/10 - python/mypy
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-10-v1.json
+  Claude finished in 46.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 146
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-python-mypy-10-v2.json
+  Claude finished in 64.9s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 274
+
+============================================================
+Trial 10/10 - ruby
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-10-v1.json
+  Claude finished in 37.3s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 108
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-10-v2.json
+  Claude finished in 41.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 230
+
+============================================================
+Trial 10/10 - ruby/steep
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-10-v1.json
+  Claude finished in 97.1s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 146
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ruby-steep-10-v2.json
+  Claude finished in 80.3s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 307
+
+============================================================
+Trial 10/10 - lua
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-10-v1.json
+  Claude finished in 75.7s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 261
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-lua-10-v2.json
+  Claude finished in 47.4s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 420
+
+============================================================
+Trial 10/10 - scheme
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-10-v1.json
+  Claude finished in 49.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 152
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-scheme-10-v2.json
+  Claude finished in 58.6s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 277
+
+============================================================
+Trial 10/10 - ocaml
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-10-v1.json
+  Claude finished in 59.4s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 137
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-ocaml-10-v2.json
+  Claude finished in 49.2s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 238
+
+============================================================
+Trial 10/10 - haskell
+============================================================
+
+--- Phase 1: v1 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-10-v1.json
+  Claude finished in 74.2s (success=true)
+  Running v1 tests...
+  Tests: 11/11 passed (PASS)
+  LOC: 113
+
+--- Phase 2: v2 ---
+  Running Claude...
+  Log saved to /home/ubuntu/claude-code-bench/logs/minigit-haskell-10-v2.json
+  Claude finished in 116.0s (success=true)
+  Running v2 tests...
+  Tests: 30/30 passed (PASS)
+  LOC: 211
+
+============================================================
+Saving results...
+============================================================
+Results saved to /home/ubuntu/claude-code-bench/results/
+Run `ruby report.rb` to generate the report.

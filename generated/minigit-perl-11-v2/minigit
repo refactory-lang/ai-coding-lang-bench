@@ -1,0 +1,279 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use File::Path qw(make_path);
+
+my $MINIGIT_DIR = '.minigit';
+
+sub minihash {
+    my ($data) = @_;
+    use integer;
+    my $h = 1469598103934665603;
+    for my $b (unpack('C*', $data)) {
+        $h ^= $b;
+        $h *= 1099511628211;
+    }
+    no integer;
+    return sprintf('%016x', $h);
+}
+
+sub read_file {
+    my ($path) = @_;
+    open my $fh, '<:raw', $path or return '';
+    local $/;
+    my $content = <$fh>;
+    close $fh;
+    return defined $content ? $content : '';
+}
+
+sub write_file {
+    my ($path, $content) = @_;
+    open my $fh, '>:raw', $path or die "Cannot write $path: $!\n";
+    print $fh $content;
+    close $fh;
+}
+
+sub cmd_init {
+    if (-d $MINIGIT_DIR) {
+        print "Repository already initialized\n";
+        return;
+    }
+    make_path("$MINIGIT_DIR/objects");
+    make_path("$MINIGIT_DIR/commits");
+    write_file("$MINIGIT_DIR/index", '');
+    write_file("$MINIGIT_DIR/HEAD", '');
+}
+
+sub cmd_add {
+    my ($file) = @_;
+    unless (defined $file && -e $file) {
+        print "File not found\n";
+        exit 1;
+    }
+    my $content = read_file($file);
+    my $hash = minihash($content);
+    write_file("$MINIGIT_DIR/objects/$hash", $content);
+
+    my $index = read_file("$MINIGIT_DIR/index");
+    my @lines = grep { $_ ne '' } split /\n/, $index;
+    unless (grep { $_ eq $file } @lines) {
+        push @lines, $file;
+        write_file("$MINIGIT_DIR/index", join("\n", @lines) . "\n");
+    }
+}
+
+sub cmd_commit {
+    my ($message) = @_;
+    my $index = read_file("$MINIGIT_DIR/index");
+    my @files = grep { $_ ne '' } split /\n/, $index;
+    if (!@files) {
+        print "Nothing to commit\n";
+        exit 1;
+    }
+
+    my $head = read_file("$MINIGIT_DIR/HEAD");
+    chomp $head if defined $head;
+    my $parent = (defined $head && $head ne '') ? $head : 'NONE';
+    my $timestamp = time();
+
+    @files = sort @files;
+
+    my $commit_content = "parent: $parent\n";
+    $commit_content .= "timestamp: $timestamp\n";
+    $commit_content .= "message: $message\n";
+    $commit_content .= "files:\n";
+    for my $f (@files) {
+        my $blob = read_file($f);
+        my $hash = minihash($blob);
+        $commit_content .= "$f $hash\n";
+    }
+
+    my $commit_hash = minihash($commit_content);
+    write_file("$MINIGIT_DIR/commits/$commit_hash", $commit_content);
+    write_file("$MINIGIT_DIR/HEAD", $commit_hash);
+    write_file("$MINIGIT_DIR/index", '');
+
+    print "Committed $commit_hash\n";
+}
+
+sub cmd_log {
+    my $head = read_file("$MINIGIT_DIR/HEAD");
+    chomp $head if defined $head;
+    if (!defined $head || $head eq '') {
+        print "No commits\n";
+        return;
+    }
+
+    my $current = $head;
+    my $first = 1;
+    while ($current ne '' && $current ne 'NONE') {
+        my $commit_file = "$MINIGIT_DIR/commits/$current";
+        last unless -f $commit_file;
+        my $content = read_file($commit_file);
+        my ($parent, $timestamp, $message);
+        for my $line (split /\n/, $content) {
+            if ($line =~ /^parent: (.*)/) { $parent = $1; }
+            elsif ($line =~ /^timestamp: (.*)/) { $timestamp = $1; }
+            elsif ($line =~ /^message: (.*)/) { $message = $1; }
+        }
+        print "\n" unless $first;
+        print "commit $current\n";
+        print "Date: $timestamp\n";
+        print "Message: $message\n";
+        $first = 0;
+        $current = (defined $parent && $parent ne 'NONE') ? $parent : '';
+    }
+}
+
+sub cmd_status {
+    my $index = read_file("$MINIGIT_DIR/index");
+    my @files = grep { $_ ne '' } split /\n/, $index;
+    print "Staged files:\n";
+    if (@files) {
+        for my $f (@files) {
+            print "$f\n";
+        }
+    } else {
+        print "(none)\n";
+    }
+}
+
+sub parse_commit {
+    my ($hash) = @_;
+    my $path = "$MINIGIT_DIR/commits/$hash";
+    return undef unless -f $path;
+    my $content = read_file($path);
+    my %info;
+    my %files;
+    my $in_files = 0;
+    for my $line (split /\n/, $content) {
+        if ($in_files) {
+            if ($line =~ /^(\S+)\s+(\S+)$/) {
+                $files{$1} = $2;
+            }
+        } elsif ($line =~ /^parent: (.*)/) { $info{parent} = $1; }
+        elsif ($line =~ /^timestamp: (.*)/) { $info{timestamp} = $1; }
+        elsif ($line =~ /^message: (.*)/) { $info{message} = $1; }
+        elsif ($line eq 'files:') { $in_files = 1; }
+    }
+    $info{files} = \%files;
+    return \%info;
+}
+
+sub cmd_diff {
+    my ($hash1, $hash2) = @_;
+    for my $h ($hash1, $hash2) {
+        unless (-f "$MINIGIT_DIR/commits/$h") {
+            print "Invalid commit\n";
+            exit 1;
+        }
+    }
+    my $c1 = parse_commit($hash1);
+    my $c2 = parse_commit($hash2);
+    my %f1 = %{$c1->{files}};
+    my %f2 = %{$c2->{files}};
+    my %all;
+    $all{$_} = 1 for keys %f1, keys %f2;
+    for my $f (sort keys %all) {
+        if (!exists $f1{$f}) {
+            print "Added: $f\n";
+        } elsif (!exists $f2{$f}) {
+            print "Removed: $f\n";
+        } elsif ($f1{$f} ne $f2{$f}) {
+            print "Modified: $f\n";
+        }
+    }
+}
+
+sub cmd_checkout {
+    my ($hash) = @_;
+    unless (defined $hash && -f "$MINIGIT_DIR/commits/$hash") {
+        print "Invalid commit\n";
+        exit 1;
+    }
+    my $c = parse_commit($hash);
+    my %files = %{$c->{files}};
+    for my $f (sort keys %files) {
+        my $blob = read_file("$MINIGIT_DIR/objects/$files{$f}");
+        write_file($f, $blob);
+    }
+    write_file("$MINIGIT_DIR/HEAD", $hash);
+    write_file("$MINIGIT_DIR/index", '');
+    print "Checked out $hash\n";
+}
+
+sub cmd_reset {
+    my ($hash) = @_;
+    unless (defined $hash && -f "$MINIGIT_DIR/commits/$hash") {
+        print "Invalid commit\n";
+        exit 1;
+    }
+    write_file("$MINIGIT_DIR/HEAD", $hash);
+    write_file("$MINIGIT_DIR/index", '');
+    print "Reset to $hash\n";
+}
+
+sub cmd_rm {
+    my ($file) = @_;
+    my $index = read_file("$MINIGIT_DIR/index");
+    my @lines = grep { $_ ne '' } split /\n/, $index;
+    my @new = grep { $_ ne $file } @lines;
+    if (scalar @new == scalar @lines) {
+        print "File not in index\n";
+        exit 1;
+    }
+    if (@new) {
+        write_file("$MINIGIT_DIR/index", join("\n", @new) . "\n");
+    } else {
+        write_file("$MINIGIT_DIR/index", '');
+    }
+}
+
+sub cmd_show {
+    my ($hash) = @_;
+    unless (defined $hash && -f "$MINIGIT_DIR/commits/$hash") {
+        print "Invalid commit\n";
+        exit 1;
+    }
+    my $c = parse_commit($hash);
+    print "commit $hash\n";
+    print "Date: $c->{timestamp}\n";
+    print "Message: $c->{message}\n";
+    print "Files:\n";
+    my %files = %{$c->{files}};
+    for my $f (sort keys %files) {
+        print "  $f $files{$f}\n";
+    }
+}
+
+my $cmd = shift @ARGV;
+unless (defined $cmd) {
+    print "Usage: minigit <command>\n";
+    exit 1;
+}
+
+if ($cmd eq 'init') {
+    cmd_init();
+} elsif ($cmd eq 'add') {
+    cmd_add(shift @ARGV);
+} elsif ($cmd eq 'commit') {
+    shift @ARGV; # -m
+    cmd_commit(shift @ARGV);
+} elsif ($cmd eq 'log') {
+    cmd_log();
+} elsif ($cmd eq 'status') {
+    cmd_status();
+} elsif ($cmd eq 'diff') {
+    cmd_diff(shift @ARGV, shift @ARGV);
+} elsif ($cmd eq 'checkout') {
+    cmd_checkout(shift @ARGV);
+} elsif ($cmd eq 'reset') {
+    cmd_reset(shift @ARGV);
+} elsif ($cmd eq 'rm') {
+    cmd_rm(shift @ARGV);
+} elsif ($cmd eq 'show') {
+    cmd_show(shift @ARGV);
+} else {
+    print "Unknown command: $cmd\n";
+    exit 1;
+}

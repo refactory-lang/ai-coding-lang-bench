@@ -1,0 +1,24 @@
+module MiniGit
+  MINIGIT_DIR: String
+  OBJECTS_DIR: String
+  COMMITS_DIR: String
+  INDEX_FILE: String
+  HEAD_FILE: String
+
+  def self.minihash: (String data) -> String
+  def self.run: (Array[String] args) -> void
+  def self.cmd_init: () -> void
+  def self.cmd_add: (String filename) -> void
+  def self.cmd_commit: (String message) -> void
+  def self.cmd_status: () -> void
+  def self.cmd_log: () -> void
+  def self.cmd_diff: (String commit1, String commit2) -> void
+  def self.cmd_checkout: (String hash) -> void
+  def self.cmd_reset: (String hash) -> void
+  def self.cmd_rm: (String filename) -> void
+  def self.cmd_show: (String hash) -> void
+  def self.parse_commit_files: (String content) -> Hash[String, String]
+  def self.read_index: () -> Array[String]
+  def self.write_index: (Array[String] entries) -> void
+  def self.read_head: () -> String
+end

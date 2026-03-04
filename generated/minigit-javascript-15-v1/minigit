@@ -1,0 +1,143 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const MINIGIT_DIR = '.minigit';
+const OBJECTS_DIR = path.join(MINIGIT_DIR, 'objects');
+const COMMITS_DIR = path.join(MINIGIT_DIR, 'commits');
+const INDEX_FILE = path.join(MINIGIT_DIR, 'index');
+const HEAD_FILE = path.join(MINIGIT_DIR, 'HEAD');
+
+function miniHash(data) {
+    let h = 1469598103934665603n;
+    for (let i = 0; i < data.length; i++) {
+        h = h ^ BigInt(data[i]);
+        h = (h * 1099511628211n) % (1n << 64n);
+    }
+    return h.toString(16).padStart(16, '0');
+}
+
+function cmdInit() {
+    if (fs.existsSync(MINIGIT_DIR)) {
+        console.log('Repository already initialized');
+        return;
+    }
+    fs.mkdirSync(OBJECTS_DIR, { recursive: true });
+    fs.mkdirSync(COMMITS_DIR, { recursive: true });
+    fs.writeFileSync(INDEX_FILE, '');
+    fs.writeFileSync(HEAD_FILE, '');
+}
+
+function cmdAdd(filename) {
+    if (!filename) {
+        console.error('Usage: minigit add <file>');
+        process.exit(1);
+    }
+    if (!fs.existsSync(filename)) {
+        console.log('File not found');
+        process.exit(1);
+    }
+    const content = fs.readFileSync(filename);
+    const hash = miniHash(content);
+    fs.writeFileSync(path.join(OBJECTS_DIR, hash), content);
+
+    const indexContent = fs.existsSync(INDEX_FILE) ? fs.readFileSync(INDEX_FILE, 'utf8') : '';
+    const entries = indexContent ? indexContent.split('\n').filter(l => l.length > 0) : [];
+    if (!entries.includes(filename)) {
+        entries.push(filename);
+        fs.writeFileSync(INDEX_FILE, entries.join('\n') + '\n');
+    }
+}
+
+function cmdCommit(message) {
+    if (!message) {
+        console.error('Usage: minigit commit -m "<message>"');
+        process.exit(1);
+    }
+    const indexContent = fs.existsSync(INDEX_FILE) ? fs.readFileSync(INDEX_FILE, 'utf8').trim() : '';
+    if (!indexContent) {
+        console.log('Nothing to commit');
+        process.exit(1);
+    }
+
+    const files = indexContent.split('\n').filter(l => l.length > 0).sort();
+    const headContent = fs.existsSync(HEAD_FILE) ? fs.readFileSync(HEAD_FILE, 'utf8').trim() : '';
+    const parent = headContent || 'NONE';
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    let commitContent = `parent: ${parent}\ntimestamp: ${timestamp}\nmessage: ${message}\nfiles:\n`;
+    for (const f of files) {
+        const content = fs.readFileSync(f);
+        const hash = miniHash(content);
+        // Also store the blob
+        fs.writeFileSync(path.join(OBJECTS_DIR, hash), content);
+        commitContent += `${f} ${hash}\n`;
+    }
+
+    const commitHash = miniHash(Buffer.from(commitContent));
+    fs.writeFileSync(path.join(COMMITS_DIR, commitHash), commitContent);
+    fs.writeFileSync(HEAD_FILE, commitHash);
+    fs.writeFileSync(INDEX_FILE, '');
+
+    console.log(`Committed ${commitHash}`);
+}
+
+function cmdLog() {
+    const headContent = fs.existsSync(HEAD_FILE) ? fs.readFileSync(HEAD_FILE, 'utf8').trim() : '';
+    if (!headContent) {
+        console.log('No commits');
+        return;
+    }
+
+    let current = headContent;
+    while (current && current !== 'NONE') {
+        const commitFile = path.join(COMMITS_DIR, current);
+        if (!fs.existsSync(commitFile)) break;
+        const content = fs.readFileSync(commitFile, 'utf8');
+        const lines = content.split('\n');
+
+        let parentHash = '', timestamp = '', message = '';
+        for (const line of lines) {
+            if (line.startsWith('parent: ')) parentHash = line.substring(8);
+            else if (line.startsWith('timestamp: ')) timestamp = line.substring(11);
+            else if (line.startsWith('message: ')) message = line.substring(9);
+        }
+
+        console.log(`commit ${current}`);
+        console.log(`Date: ${timestamp}`);
+        console.log(`Message: ${message}`);
+        console.log('');
+
+        current = parentHash;
+    }
+}
+
+// Main
+const args = process.argv.slice(2);
+const command = args[0];
+
+switch (command) {
+    case 'init':
+        cmdInit();
+        break;
+    case 'add':
+        cmdAdd(args[1]);
+        break;
+    case 'commit': {
+        let message = null;
+        const mIdx = args.indexOf('-m');
+        if (mIdx !== -1 && args[mIdx + 1]) {
+            message = args[mIdx + 1];
+        }
+        cmdCommit(message);
+        break;
+    }
+    case 'log':
+        cmdLog();
+        break;
+    default:
+        console.error(`Unknown command: ${command}`);
+        process.exit(1);
+}

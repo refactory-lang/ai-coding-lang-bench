@@ -1,0 +1,312 @@
+#!/usr/bin/env lua
+
+-- MiniGit: a minimal version control system in Lua
+
+local MINIGIT_DIR = ".minigit"
+local OBJECTS_DIR = MINIGIT_DIR .. "/objects"
+local COMMITS_DIR = MINIGIT_DIR .. "/commits"
+local INDEX_FILE  = MINIGIT_DIR .. "/index"
+local HEAD_FILE   = MINIGIT_DIR .. "/HEAD"
+
+-- Utility: check if path is a directory
+local function is_dir(path)
+    local ok, _, code = os.rename(path .. "/", path .. "/")
+    return ok or code == 13
+end
+
+-- Utility: check if file exists
+local function file_exists(path)
+    local f = io.open(path, "r")
+    if f then f:close() return true end
+    return false
+end
+
+-- Utility: read entire file as bytes
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local data = f:read("*a")
+    f:close()
+    return data
+end
+
+-- Utility: write string to file
+local function write_file(path, content)
+    local f = io.open(path, "wb")
+    if not f then return false end
+    f:write(content)
+    f:close()
+    return true
+end
+
+-- Utility: mkdir -p (simple, works for our nested paths)
+local function mkdir_p(path)
+    os.execute("mkdir -p " .. path)
+end
+
+-- MiniHash: FNV-1a variant, 64-bit, 16-char hex output
+local function minihash(data)
+    -- We need 64-bit unsigned arithmetic. Lua 5.3+ has integers but
+    -- they are signed 64-bit. We'll use floats won't work for this.
+    -- Lua 5.3 integers are 64-bit signed, so we need to handle wrapping.
+    -- In Lua 5.1/5.2 we don't have 64-bit ints natively, so we use
+    -- a two-32-bit approach for portability.
+
+    -- Split into high and low 32-bit parts
+    local h_hi = 0x14650FB0  -- upper 32 bits of 1469598103934665603
+    local h_lo = 0x6B022A83  -- lower 32 bits of 1469598103934665603
+    -- 1469598103934665603 = 0x14650FB06B022A83
+
+    local mul_hi = 0x00000100 -- upper 32 bits of 1099511628211
+    local mul_lo = 0x000001B3 -- lower 32 bits of 1099511628211
+    -- 1099511628211 = 0x00000100000001B3
+
+    for i = 1, #data do
+        local b = string.byte(data, i)
+        -- XOR with low part only (byte fits in low)
+        h_lo = h_lo ~ b  -- Lua 5.3 bitwise XOR
+
+        -- Multiply: (h_hi, h_lo) * (mul_hi, mul_lo) mod 2^64
+        -- Result_lo = (h_lo * mul_lo) mod 2^32
+        -- Result_hi = (h_hi * mul_lo + h_lo * mul_hi + carry) mod 2^32
+
+        local lo_lo = h_lo * mul_lo
+        local carry = lo_lo >> 32
+        local new_lo = lo_lo & 0xFFFFFFFF
+
+        local hi_part = (h_hi * mul_lo + h_lo * mul_hi + carry) & 0xFFFFFFFF
+
+        h_hi = hi_part
+        h_lo = new_lo
+    end
+
+    return string.format("%08x%08x", h_hi, h_lo)
+end
+
+-- Try Lua 5.3+ integer approach first (preferred)
+-- Check if we have 64-bit integers and bitwise ops
+local has_int64 = (1 << 62) ~= 0
+
+if has_int64 then
+    -- Override with proper 64-bit integer version
+    -- Lua 5.3+ signed 64-bit integers with wrapping
+    minihash = function(data)
+        local h = 1469598103934665603  -- as signed 64-bit: this fits
+        local mul = 1099511628211
+
+        for i = 1, #data do
+            local b = string.byte(data, i)
+            h = h ~ b
+            -- Multiplication with mod 2^64 wrapping
+            -- Lua 5.3 integers wrap on overflow automatically for bitwise ops
+            -- but regular multiplication may not wrap the same way.
+            -- We need unsigned mod 2^64. Let's split the multiply.
+            local lo = (h & 0xFFFFFFFF) * mul
+            local hi = (h >> 32) * mul
+            h = lo + (hi << 32)
+            -- This might overflow, but Lua 5.3 integer arithmetic wraps mod 2^64
+            -- Actually, Lua 5.3 integers DO wrap on overflow for +, -, *
+            -- So we can just do: h = h * mul directly!
+        end
+
+        -- Format as unsigned 16-char hex
+        -- h is signed, we need unsigned representation
+        if h < 0 then
+            -- Convert signed to unsigned representation for formatting
+            local hi = ((h >> 32) & 0xFFFFFFFF)
+            local lo = (h & 0xFFFFFFFF)
+            return string.format("%08x%08x", hi, lo)
+        else
+            return string.format("%016x", h)
+        end
+    end
+
+    -- Simplify: Lua 5.3 integer multiply wraps mod 2^64
+    minihash = function(data)
+        local h = 1469598103934665603
+        for i = 1, #data do
+            h = h ~ string.byte(data, i)
+            h = h * 1099511628211
+        end
+        -- Format as unsigned hex
+        if h < 0 then
+            local hi = ((h >> 32) & 0xFFFFFFFF)
+            local lo = (h & 0xFFFFFFFF)
+            return string.format("%08x%08x", hi, lo)
+        else
+            return string.format("%016x", h)
+        end
+    end
+end
+
+---------------------------------------------
+-- Commands
+---------------------------------------------
+
+local function cmd_init()
+    if is_dir(MINIGIT_DIR) then
+        print("Repository already initialized")
+        os.exit(0)
+    end
+    mkdir_p(OBJECTS_DIR)
+    mkdir_p(COMMITS_DIR)
+    write_file(INDEX_FILE, "")
+    write_file(HEAD_FILE, "")
+end
+
+local function cmd_add(filename)
+    if not filename then
+        io.stderr:write("Usage: minigit add <file>\n")
+        os.exit(1)
+    end
+    if not file_exists(filename) then
+        print("File not found")
+        os.exit(1)
+    end
+
+    local content = read_file(filename)
+    local hash = minihash(content)
+
+    -- Store blob
+    write_file(OBJECTS_DIR .. "/" .. hash, content)
+
+    -- Update index (append if not present)
+    local index_content = read_file(INDEX_FILE) or ""
+    local found = false
+    for line in index_content:gmatch("[^\n]+") do
+        if line == filename then
+            found = true
+            break
+        end
+    end
+    if not found then
+        local f = io.open(INDEX_FILE, "a")
+        f:write(filename .. "\n")
+        f:close()
+    end
+end
+
+local function cmd_commit(args)
+    -- Parse -m "message"
+    local message = nil
+    for i = 1, #args do
+        if args[i] == "-m" and args[i+1] then
+            message = args[i+1]
+            break
+        end
+    end
+    if not message then
+        io.stderr:write("Usage: minigit commit -m \"<message>\"\n")
+        os.exit(1)
+    end
+
+    -- Read index
+    local index_content = read_file(INDEX_FILE) or ""
+    local files = {}
+    for line in index_content:gmatch("[^\n]+") do
+        if line ~= "" then
+            files[#files + 1] = line
+        end
+    end
+
+    if #files == 0 then
+        print("Nothing to commit")
+        os.exit(1)
+    end
+
+    -- Sort files
+    table.sort(files)
+
+    -- Get parent
+    local head = read_file(HEAD_FILE) or ""
+    head = head:match("^%s*(.-)%s*$") -- trim
+    local parent = (head ~= "") and head or "NONE"
+
+    -- Get timestamp
+    local timestamp = tostring(os.time())
+
+    -- Build commit content
+    local lines = {}
+    lines[#lines + 1] = "parent: " .. parent
+    lines[#lines + 1] = "timestamp: " .. timestamp
+    lines[#lines + 1] = "message: " .. message
+    lines[#lines + 1] = "files:"
+
+    for _, fname in ipairs(files) do
+        local content = read_file(fname)
+        local hash = minihash(content)
+        -- Also make sure blob is stored (re-hash in case file changed)
+        write_file(OBJECTS_DIR .. "/" .. hash, content)
+        lines[#lines + 1] = fname .. " " .. hash
+    end
+
+    local commit_content = table.concat(lines, "\n") .. "\n"
+    local commit_hash = minihash(commit_content)
+
+    -- Write commit
+    write_file(COMMITS_DIR .. "/" .. commit_hash, commit_content)
+
+    -- Update HEAD
+    write_file(HEAD_FILE, commit_hash)
+
+    -- Clear index
+    write_file(INDEX_FILE, "")
+
+    print("Committed " .. commit_hash)
+end
+
+local function cmd_log()
+    local head = read_file(HEAD_FILE) or ""
+    head = head:match("^%s*(.-)%s*$")
+
+    if head == "" then
+        print("No commits")
+        return
+    end
+
+    local current = head
+    while current and current ~= "" and current ~= "NONE" do
+        local commit_content = read_file(COMMITS_DIR .. "/" .. current)
+        if not commit_content then break end
+
+        local parent = commit_content:match("parent: ([^\n]+)")
+        local timestamp = commit_content:match("timestamp: ([^\n]+)")
+        local msg = commit_content:match("message: ([^\n]+)")
+
+        print("commit " .. current)
+        print("Date: " .. timestamp)
+        print("Message: " .. msg)
+        print("")
+
+        current = parent
+        if current == "NONE" then break end
+    end
+end
+
+---------------------------------------------
+-- Main
+---------------------------------------------
+
+local command = arg[1]
+
+if not command then
+    io.stderr:write("Usage: minigit <command> [args]\n")
+    os.exit(1)
+end
+
+if command == "init" then
+    cmd_init()
+elseif command == "add" then
+    cmd_add(arg[2])
+elseif command == "commit" then
+    local args = {}
+    for i = 2, #arg do
+        args[#args + 1] = arg[i]
+    end
+    cmd_commit(args)
+elseif command == "log" then
+    cmd_log()
+else
+    io.stderr:write("Unknown command: " .. command .. "\n")
+    os.exit(1)
+end

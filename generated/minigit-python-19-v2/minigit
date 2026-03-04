@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+import sys
+import os
+import time
+
+MINIGIT_DIR = ".minigit"
+OBJECTS_DIR = os.path.join(MINIGIT_DIR, "objects")
+COMMITS_DIR = os.path.join(MINIGIT_DIR, "commits")
+INDEX_FILE = os.path.join(MINIGIT_DIR, "index")
+HEAD_FILE = os.path.join(MINIGIT_DIR, "HEAD")
+
+
+def minihash(data):
+    h = 1469598103934665603
+    for b in data:
+        h ^= b
+        h = (h * 1099511628211) % (2**64)
+    return format(h, '016x')
+
+
+def cmd_init():
+    if os.path.isdir(MINIGIT_DIR):
+        print("Repository already initialized")
+        return
+    os.makedirs(OBJECTS_DIR)
+    os.makedirs(COMMITS_DIR)
+    open(INDEX_FILE, 'w').close()
+    open(HEAD_FILE, 'w').close()
+
+
+def read_index():
+    if not os.path.isfile(INDEX_FILE):
+        return []
+    with open(INDEX_FILE, 'r') as f:
+        lines = f.read().splitlines()
+    return [l for l in lines if l]
+
+
+def write_index(entries):
+    with open(INDEX_FILE, 'w') as f:
+        for e in entries:
+            f.write(e + '\n')
+
+
+def cmd_add(filename):
+    if not os.path.isfile(filename):
+        print("File not found")
+        sys.exit(1)
+    with open(filename, 'rb') as f:
+        data = f.read()
+    h = minihash(data)
+    obj_path = os.path.join(OBJECTS_DIR, h)
+    with open(obj_path, 'wb') as f:
+        f.write(data)
+    entries = read_index()
+    if filename not in entries:
+        entries.append(filename)
+        write_index(entries)
+
+
+def cmd_commit(message):
+    entries = read_index()
+    if not entries:
+        print("Nothing to commit")
+        sys.exit(1)
+    head = ""
+    if os.path.isfile(HEAD_FILE):
+        with open(HEAD_FILE, 'r') as f:
+            head = f.read().strip()
+    parent = head if head else "NONE"
+    timestamp = int(time.time())
+    files_sorted = sorted(entries)
+    file_lines = []
+    for fn in files_sorted:
+        with open(fn, 'rb') as f:
+            data = f.read()
+        h = minihash(data)
+        file_lines.append(f"{fn} {h}")
+    commit_content = f"parent: {parent}\ntimestamp: {timestamp}\nmessage: {message}\nfiles:\n"
+    for fl in file_lines:
+        commit_content += fl + "\n"
+    commit_hash = minihash(commit_content.encode())
+    commit_path = os.path.join(COMMITS_DIR, commit_hash)
+    with open(commit_path, 'w') as f:
+        f.write(commit_content)
+    with open(HEAD_FILE, 'w') as f:
+        f.write(commit_hash)
+    write_index([])
+    print(f"Committed {commit_hash}")
+
+
+def cmd_log():
+    if not os.path.isfile(HEAD_FILE):
+        print("No commits")
+        return
+    with open(HEAD_FILE, 'r') as f:
+        current = f.read().strip()
+    if not current:
+        print("No commits")
+        return
+    first = True
+    while current and current != "NONE":
+        commit_path = os.path.join(COMMITS_DIR, current)
+        if not os.path.isfile(commit_path):
+            break
+        with open(commit_path, 'r') as f:
+            content = f.read()
+        parent = ""
+        timestamp = ""
+        message = ""
+        for line in content.splitlines():
+            if line.startswith("parent: "):
+                parent = line[8:]
+            elif line.startswith("timestamp: "):
+                timestamp = line[11:]
+            elif line.startswith("message: "):
+                message = line[9:]
+        if not first:
+            print()
+        print(f"commit {current}")
+        print(f"Date: {timestamp}")
+        print(f"Message: {message}")
+        first = False
+        current = parent if parent != "NONE" else ""
+
+
+def cmd_status():
+    entries = read_index()
+    print("Staged files:")
+    if entries:
+        for e in entries:
+            print(e)
+    else:
+        print("(none)")
+
+
+def parse_commit(commit_hash):
+    commit_path = os.path.join(COMMITS_DIR, commit_hash)
+    if not os.path.isfile(commit_path):
+        return None
+    with open(commit_path, 'r') as f:
+        content = f.read()
+    parent = ""
+    timestamp = ""
+    message = ""
+    files = {}
+    in_files = False
+    for line in content.splitlines():
+        if in_files:
+            parts = line.split(' ', 1)
+            if len(parts) == 2:
+                files[parts[0]] = parts[1]
+        elif line.startswith("parent: "):
+            parent = line[8:]
+        elif line.startswith("timestamp: "):
+            timestamp = line[11:]
+        elif line.startswith("message: "):
+            message = line[9:]
+        elif line == "files:":
+            in_files = True
+    return {"parent": parent, "timestamp": timestamp, "message": message, "files": files}
+
+
+def cmd_diff(hash1, hash2):
+    c1 = parse_commit(hash1)
+    c2 = parse_commit(hash2)
+    if c1 is None or c2 is None:
+        print("Invalid commit")
+        sys.exit(1)
+    all_files = sorted(set(list(c1["files"].keys()) + list(c2["files"].keys())))
+    for fn in all_files:
+        in1 = fn in c1["files"]
+        in2 = fn in c2["files"]
+        if in1 and in2:
+            if c1["files"][fn] != c2["files"][fn]:
+                print(f"Modified: {fn}")
+        elif in1 and not in2:
+            print(f"Removed: {fn}")
+        else:
+            print(f"Added: {fn}")
+
+
+def cmd_checkout(commit_hash):
+    info = parse_commit(commit_hash)
+    if info is None:
+        print("Invalid commit")
+        sys.exit(1)
+    for fn, blob_hash in info["files"].items():
+        blob_path = os.path.join(OBJECTS_DIR, blob_hash)
+        with open(blob_path, 'rb') as f:
+            data = f.read()
+        with open(fn, 'wb') as f:
+            f.write(data)
+    with open(HEAD_FILE, 'w') as f:
+        f.write(commit_hash)
+    write_index([])
+    print(f"Checked out {commit_hash}")
+
+
+def cmd_reset(commit_hash):
+    commit_path = os.path.join(COMMITS_DIR, commit_hash)
+    if not os.path.isfile(commit_path):
+        print("Invalid commit")
+        sys.exit(1)
+    with open(HEAD_FILE, 'w') as f:
+        f.write(commit_hash)
+    write_index([])
+    print(f"Reset to {commit_hash}")
+
+
+def cmd_rm(filename):
+    entries = read_index()
+    if filename not in entries:
+        print("File not in index")
+        sys.exit(1)
+    entries.remove(filename)
+    write_index(entries)
+
+
+def cmd_show(commit_hash):
+    info = parse_commit(commit_hash)
+    if info is None:
+        print("Invalid commit")
+        sys.exit(1)
+    print(f"commit {commit_hash}")
+    print(f"Date: {info['timestamp']}")
+    print(f"Message: {info['message']}")
+    print("Files:")
+    for fn in sorted(info["files"].keys()):
+        print(f"  {fn} {info['files'][fn]}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: minigit <command>")
+        sys.exit(1)
+    cmd = sys.argv[1]
+    if cmd == "init":
+        cmd_init()
+    elif cmd == "add":
+        if len(sys.argv) < 3:
+            print("Usage: minigit add <file>")
+            sys.exit(1)
+        cmd_add(sys.argv[2])
+    elif cmd == "commit":
+        if len(sys.argv) < 4 or sys.argv[2] != "-m":
+            print("Usage: minigit commit -m \"<message>\"")
+            sys.exit(1)
+        cmd_commit(sys.argv[3])
+    elif cmd == "log":
+        cmd_log()
+    elif cmd == "status":
+        cmd_status()
+    elif cmd == "diff":
+        if len(sys.argv) < 4:
+            print("Usage: minigit diff <commit1> <commit2>")
+            sys.exit(1)
+        cmd_diff(sys.argv[2], sys.argv[3])
+    elif cmd == "checkout":
+        if len(sys.argv) < 3:
+            print("Usage: minigit checkout <commit_hash>")
+            sys.exit(1)
+        cmd_checkout(sys.argv[2])
+    elif cmd == "reset":
+        if len(sys.argv) < 3:
+            print("Usage: minigit reset <commit_hash>")
+            sys.exit(1)
+        cmd_reset(sys.argv[2])
+    elif cmd == "rm":
+        if len(sys.argv) < 3:
+            print("Usage: minigit rm <file>")
+            sys.exit(1)
+        cmd_rm(sys.argv[2])
+    elif cmd == "show":
+        if len(sys.argv) < 3:
+            print("Usage: minigit show <commit_hash>")
+            sys.exit(1)
+        cmd_show(sys.argv[2])
+    else:
+        print(f"Unknown command: {cmd}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

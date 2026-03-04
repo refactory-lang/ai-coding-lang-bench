@@ -1,0 +1,263 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+
+const MINIGIT_DIR = '.minigit';
+const OBJECTS_DIR = path.join(MINIGIT_DIR, 'objects');
+const COMMITS_DIR = path.join(MINIGIT_DIR, 'commits');
+const INDEX_FILE = path.join(MINIGIT_DIR, 'index');
+const HEAD_FILE = path.join(MINIGIT_DIR, 'HEAD');
+
+function miniHash(data) {
+    let h = 1469598103934665603n;
+    for (let i = 0; i < data.length; i++) {
+        h ^= BigInt(data[i]);
+        h = (h * 1099511628211n) % (1n << 64n);
+    }
+    return h.toString(16).padStart(16, '0');
+}
+
+function cmdInit() {
+    if (fs.existsSync(MINIGIT_DIR)) {
+        console.log('Repository already initialized');
+        return;
+    }
+    fs.mkdirSync(OBJECTS_DIR, { recursive: true });
+    fs.mkdirSync(COMMITS_DIR, { recursive: true });
+    fs.writeFileSync(INDEX_FILE, '');
+    fs.writeFileSync(HEAD_FILE, '');
+}
+
+function cmdAdd(filename) {
+    if (!filename) {
+        console.error('Usage: minigit add <file>');
+        process.exit(1);
+    }
+    if (!fs.existsSync(filename)) {
+        console.log('File not found');
+        process.exit(1);
+    }
+    const content = fs.readFileSync(filename);
+    const hash = miniHash(content);
+    fs.writeFileSync(path.join(OBJECTS_DIR, hash), content);
+
+    const index = fs.readFileSync(INDEX_FILE, 'utf8');
+    const lines = index ? index.split('\n').filter(l => l.length > 0) : [];
+    if (!lines.includes(filename)) {
+        lines.push(filename);
+        fs.writeFileSync(INDEX_FILE, lines.join('\n') + '\n');
+    }
+}
+
+function cmdCommit(message) {
+    if (!message) {
+        console.error('Usage: minigit commit -m "<message>"');
+        process.exit(1);
+    }
+    const index = fs.readFileSync(INDEX_FILE, 'utf8');
+    const files = index.split('\n').filter(l => l.length > 0);
+    if (files.length === 0) {
+        console.log('Nothing to commit');
+        process.exit(1);
+    }
+
+    const head = fs.readFileSync(HEAD_FILE, 'utf8').trim();
+    const parent = head || 'NONE';
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    const sorted = files.slice().sort();
+    const fileEntries = sorted.map(f => {
+        const content = fs.readFileSync(f);
+        const hash = miniHash(content);
+        return `${f} ${hash}`;
+    }).join('\n');
+
+    const commitContent = `parent: ${parent}\ntimestamp: ${timestamp}\nmessage: ${message}\nfiles:\n${fileEntries}\n`;
+    const commitHash = miniHash(Buffer.from(commitContent));
+
+    fs.writeFileSync(path.join(COMMITS_DIR, commitHash), commitContent);
+    fs.writeFileSync(HEAD_FILE, commitHash);
+    fs.writeFileSync(INDEX_FILE, '');
+
+    console.log(`Committed ${commitHash}`);
+}
+
+function cmdStatus() {
+    const index = fs.readFileSync(INDEX_FILE, 'utf8');
+    const files = index.split('\n').filter(l => l.length > 0);
+    console.log('Staged files:');
+    if (files.length === 0) {
+        console.log('(none)');
+    } else {
+        for (const f of files) {
+            console.log(f);
+        }
+    }
+}
+
+function parseCommit(content) {
+    const lines = content.split('\n');
+    let parent = '';
+    let timestamp = '';
+    let message = '';
+    const files = {};
+    let inFiles = false;
+    for (const line of lines) {
+        if (line.startsWith('parent: ')) { parent = line.slice(8); inFiles = false; }
+        else if (line.startsWith('timestamp: ')) { timestamp = line.slice(11); inFiles = false; }
+        else if (line.startsWith('message: ')) { message = line.slice(9); inFiles = false; }
+        else if (line === 'files:') { inFiles = true; }
+        else if (inFiles && line.length > 0) {
+            const idx = line.lastIndexOf(' ');
+            files[line.slice(0, idx)] = line.slice(idx + 1);
+        }
+    }
+    return { parent, timestamp, message, files };
+}
+
+function cmdDiff(hash1, hash2) {
+    const p1 = path.join(COMMITS_DIR, hash1);
+    const p2 = path.join(COMMITS_DIR, hash2);
+    if (!fs.existsSync(p1) || !fs.existsSync(p2)) {
+        console.log('Invalid commit');
+        process.exit(1);
+    }
+    const c1 = parseCommit(fs.readFileSync(p1, 'utf8'));
+    const c2 = parseCommit(fs.readFileSync(p2, 'utf8'));
+    const allFiles = new Set([...Object.keys(c1.files), ...Object.keys(c2.files)]);
+    const sorted = Array.from(allFiles).sort();
+    for (const f of sorted) {
+        if (!(f in c1.files) && f in c2.files) console.log(`Added: ${f}`);
+        else if (f in c1.files && !(f in c2.files)) console.log(`Removed: ${f}`);
+        else if (c1.files[f] !== c2.files[f]) console.log(`Modified: ${f}`);
+    }
+}
+
+function cmdCheckout(commitHash) {
+    const commitPath = path.join(COMMITS_DIR, commitHash);
+    if (!fs.existsSync(commitPath)) {
+        console.log('Invalid commit');
+        process.exit(1);
+    }
+    const commit = parseCommit(fs.readFileSync(commitPath, 'utf8'));
+    for (const [filename, blobHash] of Object.entries(commit.files)) {
+        const content = fs.readFileSync(path.join(OBJECTS_DIR, blobHash));
+        fs.writeFileSync(filename, content);
+    }
+    fs.writeFileSync(HEAD_FILE, commitHash);
+    fs.writeFileSync(INDEX_FILE, '');
+    console.log(`Checked out ${commitHash}`);
+}
+
+function cmdReset(commitHash) {
+    const commitPath = path.join(COMMITS_DIR, commitHash);
+    if (!fs.existsSync(commitPath)) {
+        console.log('Invalid commit');
+        process.exit(1);
+    }
+    fs.writeFileSync(HEAD_FILE, commitHash);
+    fs.writeFileSync(INDEX_FILE, '');
+    console.log(`Reset to ${commitHash}`);
+}
+
+function cmdRm(filename) {
+    const index = fs.readFileSync(INDEX_FILE, 'utf8');
+    const lines = index.split('\n').filter(l => l.length > 0);
+    if (!lines.includes(filename)) {
+        console.log('File not in index');
+        process.exit(1);
+    }
+    const newLines = lines.filter(l => l !== filename);
+    fs.writeFileSync(INDEX_FILE, newLines.length > 0 ? newLines.join('\n') + '\n' : '');
+}
+
+function cmdShow(commitHash) {
+    const commitPath = path.join(COMMITS_DIR, commitHash);
+    if (!fs.existsSync(commitPath)) {
+        console.log('Invalid commit');
+        process.exit(1);
+    }
+    const commit = parseCommit(fs.readFileSync(commitPath, 'utf8'));
+    console.log(`commit ${commitHash}`);
+    console.log(`Date: ${commit.timestamp}`);
+    console.log(`Message: ${commit.message}`);
+    console.log('Files:');
+    const sorted = Object.keys(commit.files).sort();
+    for (const f of sorted) {
+        console.log(`  ${f} ${commit.files[f]}`);
+    }
+}
+
+function cmdLog() {
+    const head = fs.readFileSync(HEAD_FILE, 'utf8').trim();
+    if (!head) {
+        console.log('No commits');
+        return;
+    }
+
+    let current = head;
+    while (current && current !== 'NONE') {
+        const commitPath = path.join(COMMITS_DIR, current);
+        const content = fs.readFileSync(commitPath, 'utf8');
+        let parentHash = '';
+        let timestamp = '';
+        let message = '';
+        for (const line of content.split('\n')) {
+            if (line.startsWith('parent: ')) parentHash = line.slice(8);
+            else if (line.startsWith('timestamp: ')) timestamp = line.slice(11);
+            else if (line.startsWith('message: ')) message = line.slice(9);
+        }
+        console.log(`commit ${current}`);
+        console.log(`Date: ${timestamp}`);
+        console.log(`Message: ${message}`);
+        console.log('');
+        current = parentHash === 'NONE' ? '' : parentHash;
+    }
+}
+
+// Main
+const args = process.argv.slice(2);
+const command = args[0];
+
+switch (command) {
+    case 'init':
+        cmdInit();
+        break;
+    case 'add':
+        cmdAdd(args[1]);
+        break;
+    case 'commit':
+        if (args[1] === '-m') {
+            cmdCommit(args[2]);
+        } else {
+            console.error('Usage: minigit commit -m "<message>"');
+            process.exit(1);
+        }
+        break;
+    case 'status':
+        cmdStatus();
+        break;
+    case 'log':
+        cmdLog();
+        break;
+    case 'diff':
+        cmdDiff(args[1], args[2]);
+        break;
+    case 'checkout':
+        cmdCheckout(args[1]);
+        break;
+    case 'reset':
+        cmdReset(args[1]);
+        break;
+    case 'rm':
+        cmdRm(args[1]);
+        break;
+    case 'show':
+        cmdShow(args[1]);
+        break;
+    default:
+        console.error('Unknown command: ' + command);
+        process.exit(1);
+}

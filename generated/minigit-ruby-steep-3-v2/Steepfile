@@ -1,0 +1,4 @@
+target :default do
+  signature "sig"
+  check "minigit.rb"
+end

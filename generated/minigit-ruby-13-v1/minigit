@@ -1,0 +1,127 @@
+#!/usr/bin/env ruby
+
+MINIGIT_DIR = '.minigit'
+OBJECTS_DIR = File.join(MINIGIT_DIR, 'objects')
+COMMITS_DIR = File.join(MINIGIT_DIR, 'commits')
+INDEX_FILE  = File.join(MINIGIT_DIR, 'index')
+HEAD_FILE   = File.join(MINIGIT_DIR, 'HEAD')
+
+def minihash(data)
+  h = 1469598103934665603
+  data.each_byte do |b|
+    h ^= b
+    h = (h * 1099511628211) % (2**64)
+  end
+  format('%016x', h)
+end
+
+def cmd_init
+  if Dir.exist?(MINIGIT_DIR)
+    puts "Repository already initialized"
+    return
+  end
+  Dir.mkdir(MINIGIT_DIR)
+  Dir.mkdir(OBJECTS_DIR)
+  Dir.mkdir(COMMITS_DIR)
+  File.write(INDEX_FILE, '')
+  File.write(HEAD_FILE, '')
+end
+
+def cmd_add(filename)
+  unless File.exist?(filename)
+    puts "File not found"
+    exit 1
+  end
+  content = File.binread(filename)
+  hash = minihash(content)
+  File.binwrite(File.join(OBJECTS_DIR, hash), content)
+
+  index = File.exist?(INDEX_FILE) ? File.read(INDEX_FILE).split("\n").reject(&:empty?) : []
+  unless index.include?(filename)
+    index << filename
+    File.write(INDEX_FILE, index.join("\n") + "\n")
+  end
+end
+
+def cmd_commit(message)
+  index = File.exist?(INDEX_FILE) ? File.read(INDEX_FILE).split("\n").reject(&:empty?) : []
+  if index.empty?
+    puts "Nothing to commit"
+    exit 1
+  end
+
+  parent = File.read(HEAD_FILE).strip
+  parent = parent.empty? ? 'NONE' : parent
+  timestamp = Time.now.to_i
+
+  files_sorted = index.sort.map do |f|
+    content = File.binread(f)
+    hash = minihash(content)
+    "#{f} #{hash}"
+  end
+
+  commit_content = "parent: #{parent}\ntimestamp: #{timestamp}\nmessage: #{message}\nfiles:\n#{files_sorted.join("\n")}\n"
+
+  commit_hash = minihash(commit_content.b)
+  File.write(File.join(COMMITS_DIR, commit_hash), commit_content)
+  File.write(HEAD_FILE, commit_hash)
+  File.write(INDEX_FILE, '')
+  puts "Committed #{commit_hash}"
+end
+
+def cmd_log
+  head = File.read(HEAD_FILE).strip
+  if head.empty?
+    puts "No commits"
+    return
+  end
+
+  current = head
+  while current && current != 'NONE' && !current.empty?
+    commit_file = File.join(COMMITS_DIR, current)
+    break unless File.exist?(commit_file)
+    content = File.read(commit_file)
+
+    timestamp = nil
+    message = nil
+    content.each_line do |line|
+      line.chomp!
+      if line.start_with?('timestamp: ')
+        timestamp = line.sub('timestamp: ', '')
+      elsif line.start_with?('message: ')
+        message = line.sub('message: ', '')
+      elsif line.start_with?('parent: ')
+        # will read parent below
+      end
+    end
+
+    puts "commit #{current}"
+    puts "Date: #{timestamp}"
+    puts "Message: #{message}"
+    puts ""
+
+    # get parent
+    parent_line = content.lines.find { |l| l.start_with?('parent: ') }
+    current = parent_line ? parent_line.strip.sub('parent: ', '') : nil
+  end
+end
+
+command = ARGV[0]
+case command
+when 'init'
+  cmd_init
+when 'add'
+  cmd_add(ARGV[1])
+when 'commit'
+  if ARGV[1] == '-m'
+    cmd_commit(ARGV[2])
+  else
+    puts "Usage: minigit commit -m \"message\""
+    exit 1
+  end
+when 'log'
+  cmd_log
+else
+  puts "Unknown command: #{command}"
+  exit 1
+end

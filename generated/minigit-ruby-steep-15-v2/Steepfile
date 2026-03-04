@@ -1,0 +1,5 @@
+target :default do
+  signature "sig"
+  check "minigit"
+  library "fileutils"
+end

@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""MiniGit entry point."""
+
+import minigit as _mod
+
+_mod.main()

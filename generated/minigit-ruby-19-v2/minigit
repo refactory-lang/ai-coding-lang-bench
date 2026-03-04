@@ -1,0 +1,270 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+
+MINIGIT_DIR = '.minigit'
+
+def minihash(data)
+  h = 1469598103934665603
+  data.each_byte do |b|
+    h ^= b
+    h = (h * 1099511628211) % (2**64)
+  end
+  format('%016x', h)
+end
+
+def cmd_init
+  if Dir.exist?(MINIGIT_DIR)
+    puts "Repository already initialized"
+    return
+  end
+  FileUtils.mkdir_p("#{MINIGIT_DIR}/objects")
+  FileUtils.mkdir_p("#{MINIGIT_DIR}/commits")
+  File.write("#{MINIGIT_DIR}/index", "")
+  File.write("#{MINIGIT_DIR}/HEAD", "")
+end
+
+def cmd_add(filename)
+  unless File.exist?(filename)
+    puts "File not found"
+    exit 1
+  end
+  content = File.binread(filename)
+  hash = minihash(content)
+  File.binwrite("#{MINIGIT_DIR}/objects/#{hash}", content)
+
+  index_path = "#{MINIGIT_DIR}/index"
+  entries = File.exist?(index_path) ? File.read(index_path).lines.map(&:chomp).reject(&:empty?) : []
+  unless entries.include?(filename)
+    entries << filename
+    File.write(index_path, entries.join("\n") + "\n")
+  end
+end
+
+def cmd_commit(message)
+  index_path = "#{MINIGIT_DIR}/index"
+  entries = File.exist?(index_path) ? File.read(index_path).lines.map(&:chomp).reject(&:empty?) : []
+
+  if entries.empty?
+    puts "Nothing to commit"
+    exit 1
+  end
+
+  head_path = "#{MINIGIT_DIR}/HEAD"
+  parent = File.read(head_path).strip
+  parent = parent.empty? ? "NONE" : parent
+
+  timestamp = Time.now.to_i
+
+  files_sorted = entries.sort.map do |f|
+    blob_content = File.binread(f)
+    blob_hash = minihash(blob_content)
+    "#{f} #{blob_hash}"
+  end
+
+  commit_content = "parent: #{parent}\ntimestamp: #{timestamp}\nmessage: #{message}\nfiles:\n#{files_sorted.join("\n")}\n"
+
+  commit_hash = minihash(commit_content)
+  File.write("#{MINIGIT_DIR}/commits/#{commit_hash}", commit_content)
+  File.write(head_path, commit_hash)
+  File.write(index_path, "")
+
+  puts "Committed #{commit_hash}"
+end
+
+def cmd_log
+  head_path = "#{MINIGIT_DIR}/HEAD"
+  current = File.read(head_path).strip
+
+  if current.empty?
+    puts "No commits"
+    return
+  end
+
+  while current && current != "NONE" && !current.empty?
+    commit_path = "#{MINIGIT_DIR}/commits/#{current}"
+    content = File.read(commit_path)
+
+    timestamp = nil
+    message = nil
+    parent = nil
+
+    content.each_line do |line|
+      line = line.chomp
+      if line.start_with?("parent: ")
+        parent = line.sub("parent: ", "")
+      elsif line.start_with?("timestamp: ")
+        timestamp = line.sub("timestamp: ", "")
+      elsif line.start_with?("message: ")
+        message = line.sub("message: ", "")
+      end
+    end
+
+    puts "commit #{current}"
+    puts "Date: #{timestamp}"
+    puts "Message: #{message}"
+    puts ""
+
+    current = parent
+  end
+end
+
+def cmd_status
+  index_path = "#{MINIGIT_DIR}/index"
+  entries = File.exist?(index_path) ? File.read(index_path).lines.map(&:chomp).reject(&:empty?) : []
+
+  puts "Staged files:"
+  if entries.empty?
+    puts "(none)"
+  else
+    entries.each { |f| puts f }
+  end
+end
+
+def parse_commit(commit_hash)
+  commit_path = "#{MINIGIT_DIR}/commits/#{commit_hash}"
+  unless File.exist?(commit_path)
+    return nil
+  end
+  content = File.read(commit_path)
+  parent = nil
+  timestamp = nil
+  message = nil
+  files = {}
+  in_files = false
+
+  content.each_line do |line|
+    line = line.chomp
+    if in_files
+      parts = line.split(' ', 2)
+      files[parts[0]] = parts[1] if parts.length == 2
+    elsif line.start_with?("parent: ")
+      parent = line.sub("parent: ", "")
+    elsif line.start_with?("timestamp: ")
+      timestamp = line.sub("timestamp: ", "")
+    elsif line.start_with?("message: ")
+      message = line.sub("message: ", "")
+    elsif line == "files:"
+      in_files = true
+    end
+  end
+
+  { parent: parent, timestamp: timestamp, message: message, files: files }
+end
+
+def cmd_diff(hash1, hash2)
+  c1 = parse_commit(hash1)
+  c2 = parse_commit(hash2)
+
+  if c1.nil? || c2.nil?
+    puts "Invalid commit"
+    exit 1
+  end
+
+  files1 = c1[:files]
+  files2 = c2[:files]
+  all_files = (files1.keys + files2.keys).uniq.sort
+
+  all_files.each do |f|
+    if files1.key?(f) && files2.key?(f)
+      puts "Modified: #{f}" if files1[f] != files2[f]
+    elsif files2.key?(f)
+      puts "Added: #{f}"
+    else
+      puts "Removed: #{f}"
+    end
+  end
+end
+
+def cmd_checkout(commit_hash)
+  commit = parse_commit(commit_hash)
+  if commit.nil?
+    puts "Invalid commit"
+    exit 1
+  end
+
+  commit[:files].each do |filename, blob_hash|
+    content = File.binread("#{MINIGIT_DIR}/objects/#{blob_hash}")
+    File.binwrite(filename, content)
+  end
+
+  File.write("#{MINIGIT_DIR}/HEAD", commit_hash)
+  File.write("#{MINIGIT_DIR}/index", "")
+
+  puts "Checked out #{commit_hash}"
+end
+
+def cmd_reset(commit_hash)
+  commit = parse_commit(commit_hash)
+  if commit.nil?
+    puts "Invalid commit"
+    exit 1
+  end
+
+  File.write("#{MINIGIT_DIR}/HEAD", commit_hash)
+  File.write("#{MINIGIT_DIR}/index", "")
+
+  puts "Reset to #{commit_hash}"
+end
+
+def cmd_rm(filename)
+  index_path = "#{MINIGIT_DIR}/index"
+  entries = File.exist?(index_path) ? File.read(index_path).lines.map(&:chomp).reject(&:empty?) : []
+
+  unless entries.include?(filename)
+    puts "File not in index"
+    exit 1
+  end
+
+  entries.delete(filename)
+  File.write(index_path, entries.empty? ? "" : entries.join("\n") + "\n")
+end
+
+def cmd_show(commit_hash)
+  commit = parse_commit(commit_hash)
+  if commit.nil?
+    puts "Invalid commit"
+    exit 1
+  end
+
+  puts "commit #{commit_hash}"
+  puts "Date: #{commit[:timestamp]}"
+  puts "Message: #{commit[:message]}"
+  puts "Files:"
+  commit[:files].keys.sort.each do |f|
+    puts "  #{f} #{commit[:files][f]}"
+  end
+end
+
+command = ARGV[0]
+
+case command
+when 'init'
+  cmd_init
+when 'add'
+  cmd_add(ARGV[1])
+when 'commit'
+  if ARGV[1] == '-m'
+    cmd_commit(ARGV[2])
+  else
+    puts "Usage: minigit commit -m \"<message>\""
+    exit 1
+  end
+when 'log'
+  cmd_log
+when 'status'
+  cmd_status
+when 'diff'
+  cmd_diff(ARGV[1], ARGV[2])
+when 'checkout'
+  cmd_checkout(ARGV[1])
+when 'reset'
+  cmd_reset(ARGV[1])
+when 'rm'
+  cmd_rm(ARGV[1])
+when 'show'
+  cmd_show(ARGV[1])
+else
+  puts "Unknown command: #{command}"
+  exit 1
+end

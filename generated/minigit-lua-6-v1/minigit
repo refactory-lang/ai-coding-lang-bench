@@ -1,0 +1,443 @@
+#!/usr/bin/env lua
+
+-- MiniGit: minimal version control system in Lua
+
+local MINIGIT_DIR = ".minigit"
+local OBJECTS_DIR = MINIGIT_DIR .. "/objects"
+local COMMITS_DIR = MINIGIT_DIR .. "/commits"
+local INDEX_FILE  = MINIGIT_DIR .. "/index"
+local HEAD_FILE   = MINIGIT_DIR .. "/HEAD"
+
+-- Utility: check if path is a directory
+local function is_dir(path)
+    local f = io.open(path .. "/.", "r")
+    if f then f:close(); return true end
+    -- fallback: use os.execute
+    local ok = os.execute('test -d "' .. path .. '"')
+    if ok == true or ok == 0 then return true end
+    return false
+end
+
+-- Utility: check if file exists
+local function file_exists(path)
+    local f = io.open(path, "r")
+    if f then f:close(); return true end
+    return false
+end
+
+-- Utility: read entire file as bytes
+local function read_file(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local data = f:read("*a")
+    f:close()
+    return data
+end
+
+-- Utility: write data to file
+local function write_file(path, data)
+    local f = io.open(path, "wb")
+    if not f then
+        io.stderr:write("Error: cannot write to " .. path .. "\n")
+        os.exit(1)
+    end
+    f:write(data)
+    f:close()
+end
+
+-- Utility: mkdir -p
+local function mkdir_p(path)
+    os.execute('mkdir -p "' .. path .. '"')
+end
+
+-- MiniHash: FNV-1a variant, 64-bit, 16-char hex
+local function minihash(data)
+    -- We need 64-bit unsigned arithmetic. Lua 5.3+ has integers.
+    -- For Lua 5.1/5.2 compatibility, we use floating point carefully,
+    -- but Lua 5.3+ integers are 64-bit signed. We'll use bitwise ops if available.
+
+    local h = 0x1469598103934665603  -- 1469598103934665603 decimal
+
+    -- Check Lua version for approach
+    if _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" then
+        -- Use integer math with overflow handling via bit ops
+        -- In Lua 5.3+, integers are 64-bit signed
+        -- We need unsigned modular arithmetic
+        h = 1469598103934665603
+
+        for i = 1, #data do
+            local b = string.byte(data, i)
+            h = h ~ b  -- XOR
+            -- Multiply and take lower 64 bits
+            -- Since Lua 5.3 integers are signed 64-bit, multiplication
+            -- wraps around automatically for the lower 64 bits
+            -- But we need to handle overflow: use the math trick
+            h = (h * 1099511628211) & 0x7FFFFFFFFFFFFFFF
+            -- Actually we need mod 2^64, not 2^63
+            -- Let's use a different approach
+        end
+    end
+
+    -- Use a universal approach: split into high and low 32 bits
+    -- h = h_hi * 2^32 + h_lo
+    local MOD32 = 4294967296  -- 2^32
+
+    local h_hi = 0x14650FB0
+    local h_lo = 0x739D0383
+
+    -- Multiplier: 1099511628211 = 0x100000001B3
+    local m_hi = 0x100  -- 256
+    local m_lo = 0x000001B3  -- 435
+
+    for i = 1, #data do
+        local b = string.byte(data, i)
+
+        -- XOR with byte (only affects low part)
+        h_lo = h_lo ~ b
+        if not h_lo then
+            -- Lua 5.1/5.2 doesn't have ~ operator, use alternative
+            -- This code path won't be reached if ~ works
+        end
+
+        -- Multiply h by m, mod 2^64
+        -- (h_hi * 2^32 + h_lo) * (m_hi * 2^32 + m_lo)
+        -- = h_hi*m_hi*2^64 + (h_hi*m_lo + h_lo*m_hi)*2^32 + h_lo*m_lo
+        -- mod 2^64: (h_hi*m_lo + h_lo*m_hi)*2^32 + h_lo*m_lo  (drop h_hi*m_hi*2^64)
+
+        local lo_lo = h_lo * m_lo
+        local cross = (h_hi * m_lo + h_lo * m_hi) % MOD32
+
+        local new_lo = lo_lo % MOD32
+        local carry = math.floor(lo_lo / MOD32)
+        local new_hi = (cross + carry) % MOD32
+
+        h_hi = new_hi
+        h_lo = new_lo
+    end
+
+    -- Format as 16-char hex
+    return string.format("%08x%08x", h_hi, h_lo)
+end
+
+-- For Lua 5.1/5.2 where ~ is not available as XOR, we need a fallback
+-- Let's detect and use the right XOR
+local has_bitops = pcall(function()
+    local _ = 0 ~ 0  -- Lua 5.3+ XOR
+end)
+
+if not has_bitops then
+    -- Lua 5.1/5.2: implement XOR manually or use bit32/bit library
+    local bit_ok, bit = pcall(require, "bit32")
+    if not bit_ok then
+        bit_ok, bit = pcall(require, "bit")
+    end
+
+    if bit_ok and bit then
+        function minihash(data)
+            local MOD32 = 4294967296
+            local h_hi = 0x14650FB0
+            local h_lo = 0x739D0383
+            local m_hi = 0x100
+            local m_lo = 0x000001B3
+
+            for i = 1, #data do
+                local b = string.byte(data, i)
+                h_lo = bit.bxor(h_lo, b)
+
+                local lo_lo = h_lo * m_lo
+                local cross = (h_hi * m_lo + h_lo * m_hi) % MOD32
+                local new_lo = lo_lo % MOD32
+                local carry = math.floor(lo_lo / MOD32)
+                local new_hi = (cross + carry) % MOD32
+
+                h_hi = new_hi
+                h_lo = new_lo
+            end
+
+            return string.format("%08x%08x", h_hi, h_lo)
+        end
+    else
+        -- Pure Lua XOR fallback
+        local function bxor32(a, b)
+            local result = 0
+            local bit_val = 1
+            for _ = 0, 31 do
+                local a_bit = a % 2
+                local b_bit = b % 2
+                if a_bit ~= b_bit then
+                    result = result + bit_val
+                end
+                a = math.floor(a / 2)
+                b = math.floor(b / 2)
+                bit_val = bit_val * 2
+            end
+            return result
+        end
+
+        function minihash(data)
+            local MOD32 = 4294967296
+            local h_hi = 0x14650FB0
+            local h_lo = 0x739D0383
+            local m_hi = 0x100
+            local m_lo = 0x000001B3
+
+            for i = 1, #data do
+                local b = string.byte(data, i)
+                h_lo = bxor32(h_lo, b)
+
+                local lo_lo = h_lo * m_lo
+                local cross = (h_hi * m_lo + h_lo * m_hi) % MOD32
+                local new_lo = lo_lo % MOD32
+                local carry = math.floor(lo_lo / MOD32)
+                local new_hi = (cross + carry) % MOD32
+
+                h_hi = new_hi
+                h_lo = new_lo
+            end
+
+            return string.format("%08x%08x", h_hi, h_lo)
+        end
+    end
+else
+    -- Lua 5.3+: redefine with proper ~ operator
+    -- We already handle XOR in the main minihash via ~, but the split approach
+    -- also needs XOR. Let's redefine cleanly.
+    function minihash(data)
+        local MOD32 = 4294967296
+        local h_hi = 0x14650FB0
+        local h_lo = 0x739D0383
+        local m_hi = 0x100
+        local m_lo = 0x000001B3
+
+        for i = 1, #data do
+            local b = string.byte(data, i)
+            h_lo = h_lo ~ b
+
+            local lo_lo = h_lo * m_lo
+            local cross = (h_hi * m_lo + h_lo * m_hi) % MOD32
+            local new_lo = lo_lo % MOD32
+            local carry = math.floor(lo_lo / MOD32)
+            local new_hi = (cross + carry) % MOD32
+
+            h_hi = new_hi
+            h_lo = new_lo
+        end
+
+        return string.format("%08x%08x", h_hi, h_lo)
+    end
+end
+
+-- Read index file, return list of filenames
+local function read_index()
+    local lines = {}
+    local data = read_file(INDEX_FILE)
+    if not data or data == "" then return lines end
+    for line in data:gmatch("[^\n]+") do
+        if line ~= "" then
+            lines[#lines + 1] = line
+        end
+    end
+    return lines
+end
+
+-- Write index file from list of filenames
+local function write_index(lines)
+    local content = ""
+    for _, line in ipairs(lines) do
+        content = content .. line .. "\n"
+    end
+    write_file(INDEX_FILE, content)
+end
+
+-- Read HEAD
+local function read_head()
+    local data = read_file(HEAD_FILE)
+    if not data then return "" end
+    return data:match("^%s*(.-)%s*$") or ""
+end
+
+-- Write HEAD
+local function write_head(hash)
+    write_file(HEAD_FILE, hash)
+end
+
+---------------------------------------
+-- Commands
+---------------------------------------
+
+local function cmd_init()
+    if is_dir(MINIGIT_DIR) then
+        print("Repository already initialized")
+        os.exit(0)
+    end
+    mkdir_p(OBJECTS_DIR)
+    mkdir_p(COMMITS_DIR)
+    write_file(INDEX_FILE, "")
+    write_file(HEAD_FILE, "")
+    os.exit(0)
+end
+
+local function cmd_add(filename)
+    if not filename then
+        io.stderr:write("Usage: minigit add <file>\n")
+        os.exit(1)
+    end
+
+    if not file_exists(filename) then
+        print("File not found")
+        os.exit(1)
+    end
+
+    local content = read_file(filename)
+    local hash = minihash(content)
+
+    -- Store blob
+    write_file(OBJECTS_DIR .. "/" .. hash, content)
+
+    -- Update index
+    local index = read_index()
+    local found = false
+    for _, name in ipairs(index) do
+        if name == filename then
+            found = true
+            break
+        end
+    end
+    if not found then
+        index[#index + 1] = filename
+        write_index(index)
+    end
+
+    os.exit(0)
+end
+
+local function cmd_commit(args)
+    -- Parse -m "message"
+    local message = nil
+    for i = 1, #args do
+        if args[i] == "-m" and args[i + 1] then
+            message = args[i + 1]
+            break
+        end
+    end
+
+    if not message then
+        io.stderr:write("Usage: minigit commit -m \"<message>\"\n")
+        os.exit(1)
+    end
+
+    local index = read_index()
+    if #index == 0 then
+        print("Nothing to commit")
+        os.exit(1)
+    end
+
+    -- Get parent
+    local parent = read_head()
+    if parent == "" then
+        parent = "NONE"
+    end
+
+    -- Get timestamp
+    local timestamp = tostring(os.time())
+
+    -- Sort filenames
+    table.sort(index)
+
+    -- Build file entries: filename blobhash
+    local file_entries = {}
+    for _, fname in ipairs(index) do
+        local content = read_file(fname)
+        if content then
+            local hash = minihash(content)
+            file_entries[#file_entries + 1] = fname .. " " .. hash
+        end
+    end
+
+    -- Build commit content
+    local commit_content = "parent: " .. parent .. "\n"
+        .. "timestamp: " .. timestamp .. "\n"
+        .. "message: " .. message .. "\n"
+        .. "files:\n"
+
+    for _, entry in ipairs(file_entries) do
+        commit_content = commit_content .. entry .. "\n"
+    end
+
+    -- Hash commit
+    local commit_hash = minihash(commit_content)
+
+    -- Write commit
+    write_file(COMMITS_DIR .. "/" .. commit_hash, commit_content)
+
+    -- Update HEAD
+    write_head(commit_hash)
+
+    -- Clear index
+    write_file(INDEX_FILE, "")
+
+    print("Committed " .. commit_hash)
+    os.exit(0)
+end
+
+local function cmd_log()
+    local head = read_head()
+    if head == "" then
+        print("No commits")
+        os.exit(0)
+    end
+
+    local current = head
+    local first = true
+    while current and current ~= "" and current ~= "NONE" do
+        local commit_data = read_file(COMMITS_DIR .. "/" .. current)
+        if not commit_data then break end
+
+        if not first then
+            print("")
+        end
+        first = false
+
+        -- Parse commit
+        local parent_hash = commit_data:match("parent: ([^\n]+)")
+        local ts = commit_data:match("timestamp: ([^\n]+)")
+        local msg = commit_data:match("message: ([^\n]+)")
+
+        print("commit " .. current)
+        print("Date: " .. ts)
+        print("Message: " .. msg)
+
+        current = parent_hash
+    end
+
+    os.exit(0)
+end
+
+---------------------------------------
+-- Main
+---------------------------------------
+
+local command = arg[1]
+
+if not command then
+    io.stderr:write("Usage: minigit <command> [args]\n")
+    os.exit(1)
+end
+
+if command == "init" then
+    cmd_init()
+elseif command == "add" then
+    cmd_add(arg[2])
+elseif command == "commit" then
+    -- Pass remaining args
+    local commit_args = {}
+    for i = 2, #arg do
+        commit_args[#commit_args + 1] = arg[i]
+    end
+    cmd_commit(commit_args)
+elseif command == "log" then
+    cmd_log()
+else
+    io.stderr:write("Unknown command: " .. command .. "\n")
+    os.exit(1)
+end

@@ -1,0 +1,227 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+no warnings 'portable';
+use File::Path qw(make_path);
+use File::Basename qw(dirname);
+use Cwd qw(getcwd);
+
+my $MINIGIT_DIR = '.minigit';
+my $OBJECTS_DIR = "$MINIGIT_DIR/objects";
+my $COMMITS_DIR = "$MINIGIT_DIR/commits";
+my $INDEX_FILE  = "$MINIGIT_DIR/index";
+my $HEAD_FILE   = "$MINIGIT_DIR/HEAD";
+
+sub minihash {
+    my ($data) = @_;
+    # Use Math::BigInt to avoid overflow issues, or do manual 64-bit math
+    # Perl can handle 64-bit integers on 64-bit systems with 'use integer'
+    my $h = 1469598103934665603;
+    # We need unsigned 64-bit arithmetic
+    # On most 64-bit Perl, integers are 64-bit signed. We'll use modular arithmetic.
+    my $mod = 2**64;
+    for my $b (unpack('C*', $data)) {
+        $h ^= $b;
+        # Multiply and mod to stay in 64-bit unsigned range
+        # Use no integer to get floating point, but we need exact results
+        # Actually, let's use the trick with vec or just careful math
+        $h = _mul_mod64($h, 1099511628211);
+    }
+    return sprintf('%016x', $h & 0xFFFFFFFFFFFFFFFF);
+}
+
+sub _mul_mod64 {
+    my ($a, $b) = @_;
+    # Split into 32-bit halves to avoid overflow
+    my $a_lo = $a & 0xFFFFFFFF;
+    my $a_hi = ($a >> 32) & 0xFFFFFFFF;
+    my $b_lo = $b & 0xFFFFFFFF;
+    my $b_hi = ($b >> 32) & 0xFFFFFFFF;
+
+    # (a_hi * 2^32 + a_lo) * (b_hi * 2^32 + b_lo) mod 2^64
+    # = a_lo * b_lo + (a_lo * b_hi + a_hi * b_lo) * 2^32  (mod 2^64)
+    # The a_hi * b_hi * 2^64 term vanishes mod 2^64
+
+    my $lo_lo = $a_lo * $b_lo;
+    my $cross = ($a_lo * $b_hi + $a_hi * $b_lo) & 0xFFFFFFFF;
+
+    my $result = ($lo_lo + ($cross << 32)) & 0xFFFFFFFFFFFFFFFF;
+    return $result;
+}
+
+sub read_file {
+    my ($path) = @_;
+    open my $fh, '<', $path or return '';
+    local $/;
+    my $content = <$fh>;
+    close $fh;
+    return defined $content ? $content : '';
+}
+
+sub read_file_binary {
+    my ($path) = @_;
+    open my $fh, '<:raw', $path or return '';
+    local $/;
+    my $content = <$fh>;
+    close $fh;
+    return defined $content ? $content : '';
+}
+
+sub write_file {
+    my ($path, $content) = @_;
+    open my $fh, '>', $path or die "Cannot write to $path: $!\n";
+    print $fh $content;
+    close $fh;
+}
+
+sub write_file_binary {
+    my ($path, $content) = @_;
+    open my $fh, '>:raw', $path or die "Cannot write to $path: $!\n";
+    print $fh $content;
+    close $fh;
+}
+
+sub cmd_init {
+    if (-d $MINIGIT_DIR) {
+        print "Repository already initialized\n";
+        return;
+    }
+    make_path($OBJECTS_DIR);
+    make_path($COMMITS_DIR);
+    write_file($INDEX_FILE, '');
+    write_file($HEAD_FILE, '');
+}
+
+sub cmd_add {
+    my ($file) = @_;
+    unless (defined $file && -e $file) {
+        print "File not found\n";
+        exit 1;
+    }
+
+    my $content = read_file_binary($file);
+    my $hash = minihash($content);
+
+    write_file_binary("$OBJECTS_DIR/$hash", $content);
+
+    # Read current index
+    my $index_content = read_file($INDEX_FILE);
+    my @entries = grep { $_ ne '' } split(/\n/, $index_content);
+
+    # Add if not already present
+    unless (grep { $_ eq $file } @entries) {
+        push @entries, $file;
+        write_file($INDEX_FILE, join("\n", @entries) . "\n");
+    }
+}
+
+sub cmd_commit {
+    my ($message) = @_;
+
+    my $index_content = read_file($INDEX_FILE);
+    my @entries = grep { $_ ne '' } split(/\n/, $index_content);
+
+    if (@entries == 0) {
+        print "Nothing to commit\n";
+        exit 1;
+    }
+
+    # Sort filenames
+    @entries = sort @entries;
+
+    # Get parent
+    my $head = read_file($HEAD_FILE);
+    chomp $head if defined $head;
+    my $parent = (defined $head && $head ne '') ? $head : 'NONE';
+
+    # Timestamp
+    my $timestamp = time();
+
+    # Build file list with blob hashes
+    my @file_lines;
+    for my $file (@entries) {
+        my $content = read_file_binary($file);
+        my $hash = minihash($content);
+        push @file_lines, "$file $hash";
+    }
+
+    # Build commit content
+    my $commit_content = "parent: $parent\n";
+    $commit_content .= "timestamp: $timestamp\n";
+    $commit_content .= "message: $message\n";
+    $commit_content .= "files:\n";
+    $commit_content .= join("\n", @file_lines) . "\n";
+
+    my $commit_hash = minihash($commit_content);
+
+    write_file("$COMMITS_DIR/$commit_hash", $commit_content);
+    write_file($HEAD_FILE, $commit_hash);
+    write_file($INDEX_FILE, '');
+
+    print "Committed $commit_hash\n";
+}
+
+sub cmd_log {
+    my $head = read_file($HEAD_FILE);
+    chomp $head if defined $head;
+
+    if (!defined $head || $head eq '') {
+        print "No commits\n";
+        return;
+    }
+
+    my $current = $head;
+    while ($current ne '' && $current ne 'NONE') {
+        my $commit_path = "$COMMITS_DIR/$current";
+        last unless -e $commit_path;
+
+        my $content = read_file($commit_path);
+        my ($parent, $timestamp, $message);
+
+        for my $line (split(/\n/, $content)) {
+            if ($line =~ /^parent: (.*)/) {
+                $parent = $1;
+            } elsif ($line =~ /^timestamp: (.*)/) {
+                $timestamp = $1;
+            } elsif ($line =~ /^message: (.*)/) {
+                $message = $1;
+            }
+        }
+
+        print "commit $current\n";
+        print "Date: $timestamp\n";
+        print "Message: $message\n";
+        print "\n";
+
+        $current = ($parent eq 'NONE') ? '' : $parent;
+    }
+}
+
+# Main
+my $command = shift @ARGV;
+
+unless (defined $command) {
+    print "Usage: minigit <command>\n";
+    exit 1;
+}
+
+if ($command eq 'init') {
+    cmd_init();
+} elsif ($command eq 'add') {
+    my $file = shift @ARGV;
+    cmd_add($file);
+} elsif ($command eq 'commit') {
+    # Parse -m "message"
+    my $flag = shift @ARGV;
+    my $message = shift @ARGV;
+    if (!defined $flag || $flag ne '-m' || !defined $message) {
+        print "Usage: minigit commit -m \"message\"\n";
+        exit 1;
+    }
+    cmd_commit($message);
+} elsif ($command eq 'log') {
+    cmd_log();
+} else {
+    print "Unknown command: $command\n";
+    exit 1;
+}

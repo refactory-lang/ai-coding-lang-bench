@@ -1,0 +1,166 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use File::Path qw(make_path);
+
+my $MGDIR = ".minigit";
+
+sub minihash {
+    my ($data) = @_;
+    use integer;
+    my $h = 1469598103934665603;
+    for my $b (unpack("C*", $data)) {
+        $h ^= $b;
+        $h *= 1099511628211;
+    }
+    no integer;
+    return sprintf("%016x", $h);
+}
+
+sub read_file_raw {
+    my ($path) = @_;
+    open(my $fh, '<:raw', $path) or die "Cannot open $path: $!\n";
+    local $/;
+    my $content = <$fh>;
+    close($fh);
+    return $content;
+}
+
+sub write_file {
+    my ($path, $content) = @_;
+    open(my $fh, '>', $path) or die "Cannot write $path: $!\n";
+    print $fh $content;
+    close($fh);
+}
+
+sub read_lines {
+    my ($path) = @_;
+    return () unless -f $path;
+    open(my $fh, '<', $path) or die "Cannot open $path: $!\n";
+    my @lines = <$fh>;
+    close($fh);
+    chomp @lines;
+    return grep { $_ ne '' } @lines;
+}
+
+sub cmd_init {
+    if (-d $MGDIR) {
+        print "Repository already initialized\n";
+        return;
+    }
+    make_path("$MGDIR/objects", "$MGDIR/commits");
+    write_file("$MGDIR/index", "");
+    write_file("$MGDIR/HEAD", "");
+}
+
+sub cmd_add {
+    my ($file) = @_;
+    unless (defined $file && -f $file) {
+        print "File not found\n";
+        exit 1;
+    }
+    my $content = read_file_raw($file);
+    my $hash = minihash($content);
+
+    open(my $fh, '>:raw', "$MGDIR/objects/$hash") or die;
+    print $fh $content;
+    close($fh);
+
+    my @index = read_lines("$MGDIR/index");
+    unless (grep { $_ eq $file } @index) {
+        push @index, $file;
+        write_file("$MGDIR/index", join("\n", @index) . "\n");
+    }
+}
+
+sub cmd_commit {
+    my ($message) = @_;
+    my @index = read_lines("$MGDIR/index");
+
+    if (!@index) {
+        print "Nothing to commit\n";
+        exit 1;
+    }
+
+    my $head = "";
+    if (-f "$MGDIR/HEAD") {
+        open(my $fh, '<', "$MGDIR/HEAD") or die;
+        $head = <$fh> // "";
+        close($fh);
+        chomp $head;
+    }
+    my $parent = $head eq "" ? "NONE" : $head;
+    my $timestamp = time();
+
+    my @sorted = sort @index;
+    my @file_entries;
+    for my $f (@sorted) {
+        my $content = read_file_raw($f);
+        my $hash = minihash($content);
+        push @file_entries, "$f $hash";
+    }
+
+    my $commit_content = "parent: $parent\n";
+    $commit_content .= "timestamp: $timestamp\n";
+    $commit_content .= "message: $message\n";
+    $commit_content .= "files:\n";
+    for my $entry (@file_entries) {
+        $commit_content .= "$entry\n";
+    }
+
+    my $commit_hash = minihash($commit_content);
+    write_file("$MGDIR/commits/$commit_hash", $commit_content);
+    write_file("$MGDIR/HEAD", $commit_hash);
+    write_file("$MGDIR/index", "");
+    print "Committed $commit_hash\n";
+}
+
+sub cmd_log {
+    my $current = "";
+    if (-f "$MGDIR/HEAD") {
+        open(my $fh, '<', "$MGDIR/HEAD") or die;
+        $current = <$fh> // "";
+        close($fh);
+        chomp $current;
+    }
+
+    if ($current eq "") {
+        print "No commits\n";
+        return;
+    }
+
+    my $first = 1;
+    while ($current ne "" && $current ne "NONE") {
+        print "\n" unless $first;
+        $first = 0;
+
+        my @lines = read_lines("$MGDIR/commits/$current");
+        my ($par, $ts, $msg);
+        for my $line (@lines) {
+            if ($line =~ /^parent: (.+)$/) { $par = $1; }
+            elsif ($line =~ /^timestamp: (.+)$/) { $ts = $1; }
+            elsif ($line =~ /^message: (.+)$/) { $msg = $1; }
+        }
+
+        print "commit $current\n";
+        print "Date: $ts\n";
+        print "Message: $msg\n";
+        $current = $par // "NONE";
+    }
+}
+
+my $cmd = shift @ARGV // "";
+
+if ($cmd eq "init") {
+    cmd_init();
+} elsif ($cmd eq "add") {
+    cmd_add(shift @ARGV);
+} elsif ($cmd eq "commit") {
+    shift @ARGV;  # skip -m
+    cmd_commit(shift @ARGV);
+} elsif ($cmd eq "log") {
+    cmd_log();
+} else {
+    print "Usage: minigit <command>\n";
+    exit 1;
+}

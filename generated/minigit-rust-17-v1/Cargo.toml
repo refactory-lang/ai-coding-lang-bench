@@ -1,0 +1,8 @@
+[package]
+name = "minigit"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "minigit"
+path = "src/main.rs"

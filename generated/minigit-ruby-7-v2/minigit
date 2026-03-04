@@ -1,0 +1,248 @@
+#!/usr/bin/env ruby
+
+def minihash(data)
+  h = 1469598103934665603
+  data.each_byte do |b|
+    h ^= b
+    h = (h * 1099511628211) % (2**64)
+  end
+  format('%016x', h)
+end
+
+def cmd_init
+  if Dir.exist?('.minigit')
+    puts "Repository already initialized"
+    return
+  end
+  Dir.mkdir('.minigit')
+  Dir.mkdir('.minigit/objects')
+  Dir.mkdir('.minigit/commits')
+  File.write('.minigit/index', '')
+  File.write('.minigit/HEAD', '')
+end
+
+def cmd_add(filename)
+  unless File.exist?(filename)
+    puts "File not found"
+    exit 1
+  end
+  content = File.binread(filename)
+  hash = minihash(content)
+  File.binwrite(".minigit/objects/#{hash}", content)
+  index = File.read('.minigit/index').split("\n").reject(&:empty?)
+  unless index.include?(filename)
+    index << filename
+    File.write('.minigit/index', index.join("\n") + "\n")
+  end
+end
+
+def cmd_commit(message)
+  index = File.read('.minigit/index').split("\n").reject(&:empty?)
+  if index.empty?
+    puts "Nothing to commit"
+    exit 1
+  end
+
+  head = File.read('.minigit/HEAD').strip
+  parent = head.empty? ? "NONE" : head
+  timestamp = Time.now.to_i
+
+  files_sorted = index.sort
+  file_lines = files_sorted.map do |f|
+    content = File.binread(f)
+    hash = minihash(content)
+    "#{f} #{hash}"
+  end
+
+  commit_content = "parent: #{parent}\ntimestamp: #{timestamp}\nmessage: #{message}\nfiles:\n#{file_lines.join("\n")}\n"
+
+  commit_hash = minihash(commit_content.b)
+  File.write(".minigit/commits/#{commit_hash}", commit_content)
+  File.write('.minigit/HEAD', commit_hash)
+  File.write('.minigit/index', '')
+
+  puts "Committed #{commit_hash}"
+end
+
+def cmd_status
+  index = File.read('.minigit/index').split("\n").reject(&:empty?)
+  puts "Staged files:"
+  if index.empty?
+    puts "(none)"
+  else
+    index.each { |f| puts f }
+  end
+end
+
+def cmd_log
+  head = File.read('.minigit/HEAD').strip
+  if head.empty?
+    puts "No commits"
+    return
+  end
+
+  current = head
+  while current && current != "NONE"
+    content = File.read(".minigit/commits/#{current}")
+    lines = content.split("\n")
+    timestamp = nil
+    message = nil
+    lines.each do |line|
+      if line.start_with?("timestamp: ")
+        timestamp = line.sub("timestamp: ", "")
+      elsif line.start_with?("message: ")
+        message = line.sub("message: ", "")
+      end
+    end
+    puts "commit #{current}"
+    puts "Date: #{timestamp}"
+    puts "Message: #{message}"
+    puts ""
+
+    parent_line = lines.find { |l| l.start_with?("parent: ") }
+    current = parent_line ? parent_line.sub("parent: ", "") : nil
+  end
+end
+
+def parse_commit_files(commit_hash)
+  content = File.read(".minigit/commits/#{commit_hash}")
+  lines = content.split("\n")
+  files = {}
+  in_files = false
+  lines.each do |line|
+    if line == "files:"
+      in_files = true
+    elsif in_files && !line.empty?
+      parts = line.split(" ", 2)
+      files[parts[0]] = parts[1]
+    end
+  end
+  files
+end
+
+def parse_commit(commit_hash)
+  content = File.read(".minigit/commits/#{commit_hash}")
+  lines = content.split("\n")
+  timestamp = nil
+  message = nil
+  lines.each do |line|
+    if line.start_with?("timestamp: ")
+      timestamp = line.sub("timestamp: ", "")
+    elsif line.start_with?("message: ")
+      message = line.sub("message: ", "")
+    end
+  end
+  { timestamp: timestamp, message: message }
+end
+
+def cmd_diff(hash1, hash2)
+  unless File.exist?(".minigit/commits/#{hash1}") && File.exist?(".minigit/commits/#{hash2}")
+    puts "Invalid commit"
+    exit 1
+  end
+
+  files1 = parse_commit_files(hash1)
+  files2 = parse_commit_files(hash2)
+
+  all_files = (files1.keys + files2.keys).uniq.sort
+
+  all_files.each do |f|
+    if files1[f].nil?
+      puts "Added: #{f}"
+    elsif files2[f].nil?
+      puts "Removed: #{f}"
+    elsif files1[f] != files2[f]
+      puts "Modified: #{f}"
+    end
+  end
+end
+
+def cmd_checkout(commit_hash)
+  unless File.exist?(".minigit/commits/#{commit_hash}")
+    puts "Invalid commit"
+    exit 1
+  end
+
+  files = parse_commit_files(commit_hash)
+  files.each do |filename, blob_hash|
+    content = File.binread(".minigit/objects/#{blob_hash}")
+    File.binwrite(filename, content)
+  end
+
+  File.write('.minigit/HEAD', commit_hash)
+  File.write('.minigit/index', '')
+
+  puts "Checked out #{commit_hash}"
+end
+
+def cmd_reset(commit_hash)
+  unless File.exist?(".minigit/commits/#{commit_hash}")
+    puts "Invalid commit"
+    exit 1
+  end
+
+  File.write('.minigit/HEAD', commit_hash)
+  File.write('.minigit/index', '')
+
+  puts "Reset to #{commit_hash}"
+end
+
+def cmd_rm(filename)
+  index = File.read('.minigit/index').split("\n").reject(&:empty?)
+  unless index.include?(filename)
+    puts "File not in index"
+    exit 1
+  end
+  index.delete(filename)
+  if index.empty?
+    File.write('.minigit/index', '')
+  else
+    File.write('.minigit/index', index.join("\n") + "\n")
+  end
+end
+
+def cmd_show(commit_hash)
+  unless File.exist?(".minigit/commits/#{commit_hash}")
+    puts "Invalid commit"
+    exit 1
+  end
+
+  info = parse_commit(commit_hash)
+  files = parse_commit_files(commit_hash)
+
+  puts "commit #{commit_hash}"
+  puts "Date: #{info[:timestamp]}"
+  puts "Message: #{info[:message]}"
+  puts "Files:"
+  files.keys.sort.each do |f|
+    puts "  #{f} #{files[f]}"
+  end
+end
+
+case ARGV[0]
+when 'init'
+  cmd_init
+when 'add'
+  cmd_add(ARGV[1])
+when 'commit'
+  if ARGV[1] == '-m'
+    cmd_commit(ARGV[2])
+  end
+when 'status'
+  cmd_status
+when 'log'
+  cmd_log
+when 'diff'
+  cmd_diff(ARGV[1], ARGV[2])
+when 'checkout'
+  cmd_checkout(ARGV[1])
+when 'reset'
+  cmd_reset(ARGV[1])
+when 'rm'
+  cmd_rm(ARGV[1])
+when 'show'
+  cmd_show(ARGV[1])
+else
+  puts "Unknown command"
+  exit 1
+end

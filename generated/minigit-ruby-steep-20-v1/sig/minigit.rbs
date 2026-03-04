@@ -1,0 +1,16 @@
+MINIGIT_DIR: String
+OBJECTS_DIR: String
+COMMITS_DIR: String
+INDEX_FILE: String
+HEAD_FILE: String
+
+class Object
+  private
+
+  def minihash: (String data) -> String
+  def cmd_init: () -> void
+  def cmd_add: (String filename) -> void
+  def read_index: () -> Array[String]
+  def cmd_commit: (String message) -> void
+  def cmd_log: () -> void
+end

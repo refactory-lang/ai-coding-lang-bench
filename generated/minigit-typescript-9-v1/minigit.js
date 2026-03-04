@@ -1,0 +1,129 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs = require("fs");
+const path = require("path");
+const MINIGIT_DIR = ".minigit";
+const OBJECTS_DIR = path.join(MINIGIT_DIR, "objects");
+const COMMITS_DIR = path.join(MINIGIT_DIR, "commits");
+const INDEX_FILE = path.join(MINIGIT_DIR, "index");
+const HEAD_FILE = path.join(MINIGIT_DIR, "HEAD");
+function miniHash(data) {
+    let h = BigInt("1469598103934665603");
+    const mod = BigInt(1) << BigInt(64);
+    const mul = BigInt("1099511628211");
+    for (let i = 0; i < data.length; i++) {
+        h = h ^ BigInt(data[i]);
+        h = (h * mul) % mod;
+    }
+    return h.toString(16).padStart(16, "0");
+}
+function cmdInit() {
+    if (fs.existsSync(MINIGIT_DIR)) {
+        console.log("Repository already initialized");
+        return;
+    }
+    fs.mkdirSync(OBJECTS_DIR, { recursive: true });
+    fs.mkdirSync(COMMITS_DIR, { recursive: true });
+    fs.writeFileSync(INDEX_FILE, "");
+    fs.writeFileSync(HEAD_FILE, "");
+}
+function cmdAdd(filename) {
+    if (!fs.existsSync(filename)) {
+        console.log("File not found");
+        process.exit(1);
+    }
+    const content = fs.readFileSync(filename);
+    const hash = miniHash(content);
+    fs.writeFileSync(path.join(OBJECTS_DIR, hash), content);
+    const index = fs.readFileSync(INDEX_FILE, "utf-8");
+    const entries = index.trim() === "" ? [] : index.trim().split("\n");
+    if (!entries.includes(filename)) {
+        entries.push(filename);
+        fs.writeFileSync(INDEX_FILE, entries.join("\n") + "\n");
+    }
+}
+function cmdCommit(message) {
+    const index = fs.readFileSync(INDEX_FILE, "utf-8").trim();
+    if (index === "") {
+        console.log("Nothing to commit");
+        process.exit(1);
+    }
+    const files = index.split("\n").sort();
+    const head = fs.readFileSync(HEAD_FILE, "utf-8").trim();
+    const parent = head === "" ? "NONE" : head;
+    const timestamp = Math.floor(Date.now() / 1000);
+    let commitContent = `parent: ${parent}\ntimestamp: ${timestamp}\nmessage: ${message}\nfiles:\n`;
+    for (const f of files) {
+        const content = fs.readFileSync(f);
+        const hash = miniHash(content);
+        commitContent += `${f} ${hash}\n`;
+    }
+    const commitHash = miniHash(Buffer.from(commitContent));
+    fs.writeFileSync(path.join(COMMITS_DIR, commitHash), commitContent);
+    fs.writeFileSync(HEAD_FILE, commitHash);
+    fs.writeFileSync(INDEX_FILE, "");
+    console.log(`Committed ${commitHash}`);
+}
+function cmdLog() {
+    let current = fs.readFileSync(HEAD_FILE, "utf-8").trim();
+    if (current === "") {
+        console.log("No commits");
+        return;
+    }
+    while (current !== "" && current !== "NONE") {
+        const commitContent = fs.readFileSync(path.join(COMMITS_DIR, current), "utf-8");
+        const lines = commitContent.split("\n");
+        let parentHash = "NONE";
+        let timestamp = "";
+        let message = "";
+        for (const line of lines) {
+            if (line.startsWith("parent: "))
+                parentHash = line.substring(8);
+            else if (line.startsWith("timestamp: "))
+                timestamp = line.substring(11);
+            else if (line.startsWith("message: "))
+                message = line.substring(9);
+        }
+        console.log(`commit ${current}`);
+        console.log(`Date: ${timestamp}`);
+        console.log(`Message: ${message}`);
+        console.log("");
+        current = parentHash;
+    }
+}
+function main() {
+    const args = process.argv.slice(2);
+    if (args.length === 0) {
+        console.log("Usage: minigit <command>");
+        process.exit(1);
+    }
+    const command = args[0];
+    switch (command) {
+        case "init":
+            cmdInit();
+            break;
+        case "add":
+            if (args.length < 2) {
+                console.log("Usage: minigit add <file>");
+                process.exit(1);
+            }
+            cmdAdd(args[1]);
+            break;
+        case "commit":
+            if (args[1] === "-m" && args.length >= 3) {
+                cmdCommit(args[2]);
+            }
+            else {
+                console.log("Usage: minigit commit -m \"<message>\"");
+                process.exit(1);
+            }
+            break;
+        case "log":
+            cmdLog();
+            break;
+        default:
+            console.log(`Unknown command: ${command}`);
+            process.exit(1);
+    }
+}
+main();

@@ -1,0 +1,111 @@
+#!/usr/bin/env ruby
+
+def minihash(data)
+  h = 1469598103934665603
+  data.each_byte do |b|
+    h ^= b
+    h = (h * 1099511628211) % (2**64)
+  end
+  format('%016x', h)
+end
+
+def cmd_init
+  if Dir.exist?('.minigit')
+    puts "Repository already initialized"
+    return
+  end
+  Dir.mkdir('.minigit')
+  Dir.mkdir('.minigit/objects')
+  Dir.mkdir('.minigit/commits')
+  File.write('.minigit/index', '')
+  File.write('.minigit/HEAD', '')
+end
+
+def cmd_add(filename)
+  unless File.exist?(filename)
+    puts "File not found"
+    exit 1
+  end
+  content = File.binread(filename)
+  hash = minihash(content)
+  File.binwrite(".minigit/objects/#{hash}", content)
+  index = File.read('.minigit/index').split("\n").reject(&:empty?)
+  unless index.include?(filename)
+    index << filename
+    File.write('.minigit/index', index.join("\n") + "\n")
+  end
+end
+
+def cmd_commit(message)
+  index = File.read('.minigit/index').split("\n").reject(&:empty?)
+  if index.empty?
+    puts "Nothing to commit"
+    exit 1
+  end
+
+  head = File.read('.minigit/HEAD').strip
+  parent = head.empty? ? "NONE" : head
+  timestamp = Time.now.to_i
+
+  files_sorted = index.sort
+  file_lines = files_sorted.map do |f|
+    content = File.binread(f)
+    hash = minihash(content)
+    "#{f} #{hash}"
+  end
+
+  commit_content = "parent: #{parent}\ntimestamp: #{timestamp}\nmessage: #{message}\nfiles:\n#{file_lines.join("\n")}\n"
+
+  commit_hash = minihash(commit_content.b)
+  File.write(".minigit/commits/#{commit_hash}", commit_content)
+  File.write('.minigit/HEAD', commit_hash)
+  File.write('.minigit/index', '')
+
+  puts "Committed #{commit_hash}"
+end
+
+def cmd_log
+  head = File.read('.minigit/HEAD').strip
+  if head.empty?
+    puts "No commits"
+    return
+  end
+
+  current = head
+  while current && current != "NONE"
+    content = File.read(".minigit/commits/#{current}")
+    lines = content.split("\n")
+    timestamp = nil
+    message = nil
+    lines.each do |line|
+      if line.start_with?("timestamp: ")
+        timestamp = line.sub("timestamp: ", "")
+      elsif line.start_with?("message: ")
+        message = line.sub("message: ", "")
+      end
+    end
+    puts "commit #{current}"
+    puts "Date: #{timestamp}"
+    puts "Message: #{message}"
+    puts ""
+
+    parent_line = lines.find { |l| l.start_with?("parent: ") }
+    current = parent_line ? parent_line.sub("parent: ", "") : nil
+  end
+end
+
+case ARGV[0]
+when 'init'
+  cmd_init
+when 'add'
+  cmd_add(ARGV[1])
+when 'commit'
+  if ARGV[1] == '-m'
+    cmd_commit(ARGV[2])
+  end
+when 'log'
+  cmd_log
+else
+  puts "Unknown command"
+  exit 1
+end

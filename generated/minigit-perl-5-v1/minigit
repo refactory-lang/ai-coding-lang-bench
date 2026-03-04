@@ -1,0 +1,199 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+no warnings 'portable';
+use File::Copy;
+use File::Path qw(make_path);
+use Cwd qw(getcwd);
+
+sub minihash {
+    my ($data) = @_;
+    my $h = 1469598103934665603;
+    # Use Math::BigInt-like manual 64-bit arithmetic via 'use integer' won't work
+    # Perl can handle 64-bit if built with 64-bit support; let's use it
+    no warnings 'portable';
+    for my $b (unpack('C*', $data)) {
+        $h ^= $b;
+        # Multiply and mod 2^64 using native integers
+        # We need unsigned 64-bit math
+        use integer;
+        $h = _mul_mod64($h, 1099511628211);
+    }
+    return sprintf("%016x", $h);
+}
+
+sub _mul_mod64 {
+    my ($a, $b) = @_;
+    # For 64-bit Perl, we can do this with bit masking
+    # Split into high and low 32 bits to avoid overflow
+    my $mask32 = 0xFFFFFFFF;
+    my $a_lo = $a & $mask32;
+    my $a_hi = ($a >> 32) & $mask32;
+    my $b_lo = $b & $mask32;
+    my $b_hi = ($b >> 32) & $mask32;
+
+    # Full product mod 2^64:
+    # (a_hi*2^32 + a_lo) * (b_hi*2^32 + b_lo)
+    # = a_hi*b_hi*2^64 + (a_hi*b_lo + a_lo*b_hi)*2^32 + a_lo*b_lo
+    # mod 2^64: a_hi*b_hi*2^64 vanishes
+    my $lo_lo = $a_lo * $b_lo;
+    my $cross = ($a_hi * $b_lo + $a_lo * $b_hi) & $mask32;
+
+    my $result = ($cross << 32) + $lo_lo;
+    # Mask to 64 bits (no-op on 64-bit perl, but safe)
+    return $result & 0xFFFFFFFFFFFFFFFF;
+}
+
+sub read_file {
+    my ($path) = @_;
+    open(my $fh, '<:raw', $path) or return undef;
+    local $/;
+    my $content = <$fh>;
+    close $fh;
+    return $content;
+}
+
+sub write_file {
+    my ($path, $content) = @_;
+    open(my $fh, '>:raw', $path) or die "Cannot write $path: $!\n";
+    print $fh $content;
+    close $fh;
+}
+
+sub cmd_init {
+    if (-d '.minigit') {
+        print "Repository already initialized\n";
+        return;
+    }
+    make_path('.minigit/objects');
+    make_path('.minigit/commits');
+    write_file('.minigit/index', '');
+    write_file('.minigit/HEAD', '');
+}
+
+sub cmd_add {
+    my ($file) = @_;
+    unless (defined $file && -f $file) {
+        print "File not found\n";
+        exit 1;
+    }
+
+    my $content = read_file($file);
+    my $hash = minihash($content);
+
+    write_file(".minigit/objects/$hash", $content);
+
+    # Read current index
+    my $index_content = read_file('.minigit/index') // '';
+    my @entries = grep { $_ ne '' } split(/\n/, $index_content);
+
+    unless (grep { $_ eq $file } @entries) {
+        push @entries, $file;
+        write_file('.minigit/index', join("\n", @entries) . "\n");
+    }
+}
+
+sub cmd_commit {
+    my ($message) = @_;
+
+    my $index_content = read_file('.minigit/index') // '';
+    my @entries = grep { $_ ne '' } split(/\n/, $index_content);
+
+    if (scalar @entries == 0) {
+        print "Nothing to commit\n";
+        exit 1;
+    }
+
+    # Sort filenames
+    @entries = sort @entries;
+
+    # Get parent
+    my $head = read_file('.minigit/HEAD') // '';
+    chomp $head;
+    my $parent = $head ne '' ? $head : 'NONE';
+
+    # Get timestamp
+    my $timestamp = time();
+
+    # Build file list
+    my @file_lines;
+    for my $file (@entries) {
+        my $content = read_file($file);
+        my $hash = minihash($content);
+        push @file_lines, "$file $hash";
+    }
+
+    # Build commit content
+    my $commit_content = "parent: $parent\n";
+    $commit_content .= "timestamp: $timestamp\n";
+    $commit_content .= "message: $message\n";
+    $commit_content .= "files:\n";
+    $commit_content .= join("\n", @file_lines) . "\n";
+
+    my $commit_hash = minihash($commit_content);
+
+    write_file(".minigit/commits/$commit_hash", $commit_content);
+    write_file('.minigit/HEAD', $commit_hash);
+    write_file('.minigit/index', '');
+
+    print "Committed $commit_hash\n";
+}
+
+sub cmd_log {
+    my $head = read_file('.minigit/HEAD') // '';
+    chomp $head;
+
+    if ($head eq '') {
+        print "No commits\n";
+        return;
+    }
+
+    my $current = $head;
+    while ($current ne '' && $current ne 'NONE') {
+        my $commit_content = read_file(".minigit/commits/$current");
+        last unless defined $commit_content;
+
+        my ($parent, $timestamp, $message);
+        for my $line (split(/\n/, $commit_content)) {
+            if ($line =~ /^parent: (.*)$/) {
+                $parent = $1;
+            } elsif ($line =~ /^timestamp: (.*)$/) {
+                $timestamp = $1;
+            } elsif ($line =~ /^message: (.*)$/) {
+                $message = $1;
+            }
+        }
+
+        print "commit $current\n";
+        print "Date: $timestamp\n";
+        print "Message: $message\n";
+        print "\n";
+
+        $current = ($parent eq 'NONE') ? '' : $parent;
+    }
+}
+
+# Main
+my $command = shift @ARGV;
+
+if (!defined $command) {
+    print "Usage: minigit <command>\n";
+    exit 1;
+}
+
+if ($command eq 'init') {
+    cmd_init();
+} elsif ($command eq 'add') {
+    my $file = shift @ARGV;
+    cmd_add($file);
+} elsif ($command eq 'commit') {
+    # Parse -m "message"
+    my $flag = shift @ARGV;
+    my $message = shift @ARGV;
+    cmd_commit($message);
+} elsif ($command eq 'log') {
+    cmd_log();
+} else {
+    print "Unknown command: $command\n";
+    exit 1;
+}
