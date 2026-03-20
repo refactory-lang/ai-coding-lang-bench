@@ -11,7 +11,7 @@
 
 ### Session 2026-03-20
 
-- Q: Which AI model and provider should the review harness use for the single-pass non-agentic review call? → A: Anthropic Claude; model version is configurable (e.g. `claude-sonnet-4-5`), consistent with existing benchmark infrastructure.
+- Q: Which AI model and provider should the review harness use for the single-pass non-agentic review call? → A: Anthropic Claude; model version is configurable (e.g. `claude-opus-4.6`), consistent with existing benchmark infrastructure.
 - Q: When two seeded bugs co-locate in the same function/location, how should detection scoring work? → A: Count each bug independently — detecting at least one finding that maps to a co-located bug location counts as a TP for each bug in that location.
 - Q: How many implementations are targeted and how are they selected from `results/results.json`? → A: All successful Python and Rust runs from `results/results.json` (however many exist); seed each with a fixed count of 3 bugs per implementation for consistency.
 - Q: When a review API call fails, what is the retry policy and what happens after exhausting retries? → A: Retry up to 3 times with exponential backoff; if still failing, mark run as missing data, exclude from analysis, and document in the report.
@@ -31,7 +31,7 @@ Track 1 investigates the *reviewability gap* — the hypothesis that code genera
 
 ### User Story 1 — Bug Injection and Single-Pass Review (Priority: P1)
 
-A researcher selects all successful MiniGit implementations (Python and Rust) from `results/results.json`, injects exactly 3 seeded logic bugs into each implementation, submits each seeded implementation to a non-agentic Anthropic Claude reviewer (single pass, no tool use; model version configurable, e.g. `claude-sonnet-4-5`), and receives a structured review report that records which bugs were detected.
+A researcher selects all successful MiniGit implementations (Python and Rust) from `results/results.json`, injects exactly 3 seeded logic bugs into each implementation, submits each seeded implementation to a non-agentic Anthropic Claude reviewer (single pass, no tool use; model version configurable, e.g. `claude-opus-4.6`), and receives a structured review report that records which bugs were detected.
 
 **Why this priority**: This is the core falsifiability test (condition F1). Without a working bug injection and review pipeline, Experiments B and H have nothing to operate on.
 
@@ -94,7 +94,7 @@ A researcher analyses the token counts from all review API calls made during Exp
 
 - **FR-001**: The bug injection tool MUST accept an implementation directory and produce a mutated copy seeded with exactly 3 bugs, with a machine-readable manifest listing each injected bug's ID, type, file path, and line number.
 - **FR-002**: Injected bugs MUST be logic errors that do not prevent compilation or cause all MiniGit tests to fail — the implementation must remain partially functional.
-- **FR-003**: The review harness MUST submit each seeded implementation to the Anthropic Claude AI reviewer (model version configurable; default `claude-sonnet-4-5`) as a single, non-agentic API call (no tool use, no multi-turn conversation) and save the full response.
+- **FR-003**: The review harness MUST submit each seeded implementation to the Anthropic Claude AI reviewer (model version configurable; default `claude-opus-4.6`) as a single, non-agentic API call (no tool use, no multi-turn conversation) and save the full response.
 - **FR-003a**: If a review API call fails, the harness MUST retry up to 3 times using exponential backoff. If all retries are exhausted, the run MUST be marked as missing data, excluded from analysis, and documented in the final report.
 - **FR-004**: The review harness MUST support at least two reviewer configurations: (a) unconstrained and (b) Refactory-profile constrained.
 - **FR-005**: The scoring tool MUST compare saved review responses against the bug manifest and produce per-run metrics: defect detection rate (DDR) and false positive rate (FPR).
@@ -130,7 +130,7 @@ A researcher analyses the token counts from all review API calls made during Exp
 
 - The benchmark's existing `results/results.json` and generated code (in the `data` branch) provide the pool of successful Python and Rust implementations to inject bugs into; all successful runs from that file constitute the full target set.
 - "Non-agentic" means a single API call with no function/tool use enabled and no follow-up turns; this is the baseline reviewability condition.
-- The AI reviewer is Anthropic Claude; the specific model version (e.g. `claude-sonnet-4-5`) is configurable via the harness configuration file, consistent with existing benchmark infrastructure.
+- The AI reviewer is Anthropic Claude; the specific model version (e.g. `claude-opus-4.6`) is configurable via the harness configuration file, consistent with existing benchmark infrastructure.
 - Each implementation is seeded with exactly 3 bugs (fixed count); this ensures uniform statistical comparison across languages and conditions.
 - The Refactory-profile constraint is an existing, documented prompt profile; its exact definition is outside the scope of this spec but must be referenced by the review harness configuration.
 - Model pricing used in Experiment H is fixed at the published rate at the time of the experiment run and stored in the token log metadata.
