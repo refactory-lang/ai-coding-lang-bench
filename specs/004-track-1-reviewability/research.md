@@ -96,7 +96,7 @@ system prompt of ~500 tokens and output of up to 4096 tokens:
 - Output tokens per review: ~500 – 1 500
 - Total per run: ~1 500 – 3 500 tokens  
 - 39 runs × 2 conditions × 3 500 ≈ **273 000 tokens max** (~$1.10 at
-  claude-opus-4.5 pricing as of 2026-03)
+  claude-opus-4.6 pricing as of 2026-03)
 
 ### Retry Policy (FR-003a)
 Exponential backoff: attempt 1 → wait 2 s → attempt 2 → wait 4 s → attempt 3
