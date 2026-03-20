@@ -32,7 +32,7 @@
 ## Notes
 
 - All clarification questions resolved via `/speckit.clarify` session on 2026-03-20.
-- **AI reviewer model**: Anthropic Claude, model generation configurable (e.g. `claude-sonnet-4-5`); reflected in FR-003 and Assumptions.
+- **AI reviewer model**: Anthropic Claude, model version configurable (e.g. `claude-sonnet-4-5`); reflected in FR-003 and Assumptions.
 - **Co-location scoring**: Each co-located bug scored independently; at least one finding at the shared location counts as TP for every bug there; reflected in Acceptance Scenario 3 (User Story 1) and the resolved Edge Cases section.
 - **Target implementations + bug count**: All successful Python and Rust runs from `results/results.json`; fixed count of exactly 3 bugs per implementation; reflected in FR-001, SC-001, SC-002, and Assumptions.
 - **API failure retry policy**: Up to 3 retries with exponential backoff; exhausted-retry runs marked as missing data and documented in report; reflected in FR-003a and SC-002.
