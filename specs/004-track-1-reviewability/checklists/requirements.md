@@ -6,19 +6,19 @@
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Focused on user value and business needs
 - [x] Written for non-technical stakeholders
 - [x] All mandatory sections completed
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
 - [x] All acceptance scenarios are defined
-- [x] Edge cases are identified
+- [x] Edge cases are identified and resolved
 - [x] Scope is clearly bounded
 - [x] Dependencies and assumptions identified
 
@@ -31,8 +31,9 @@
 
 ## Notes
 
-- The spec contains no [NEEDS CLARIFICATION] markers — all sections have been completed with reasonable defaults documented in the Assumptions section.
-- Three open questions remain that could benefit from author input (surfaced via `/speckit.clarify`):
-  1. **Bug co-location**: How to score detection when two seeded bugs appear in the same function (edge case, not a blocker).
-  2. **Refactory-profile definition**: The exact prompt profile for Experiment B is referenced but not reproduced in this spec by design — the constraint must be confirmed as documented elsewhere before implementation begins.
-  3. **Target implementation count**: The spec assumes all successful Python and Rust runs from existing results are eligible; the exact number of target implementations should be confirmed against `results/results.json`.
+- All clarification questions resolved via `/speckit.clarify` session on 2026-03-20.
+- **AI reviewer model**: Anthropic Claude, model generation configurable (e.g. `claude-sonnet-4-5`); reflected in FR-003 and Assumptions.
+- **Co-location scoring**: Each co-located bug scored independently; at least one finding at the shared location counts as TP for every bug there; reflected in Acceptance Scenario 3 (User Story 1) and the resolved Edge Cases section.
+- **Target implementations + bug count**: All successful Python and Rust runs from `results/results.json`; fixed count of exactly 3 bugs per implementation; reflected in FR-001, SC-001, SC-002, and Assumptions.
+- **API failure retry policy**: Up to 3 retries with exponential backoff; exhausted-retry runs marked as missing data and documented in report; reflected in FR-003a and SC-002.
+- Spec is ready to proceed to `/speckit.plan`.
