@@ -4,8 +4,29 @@ Extension of [mame/ai-coding-lang-bench](https://github.com/mame/ai-coding-lang-
 
 ## Track 1: Reviewability Gap
 
+### Running Track 1
+
+Run the full Track 1 pipeline (inject → review → score → analyse → report) with:
+
+```bash
+bash run-track1.sh --condition both --model claude-opus-4.6
+```
+
+For a dry-run that prints all commands without making API calls:
+
+```bash
+bash run-track1.sh --dry-run
+```
+
+See [`specs/004-track-1-reviewability/quickstart.md`](specs/004-track-1-reviewability/quickstart.md)
+for the step-by-step reproduction guide.
+
+**Expected runtime**: ~5 min for injection + scoring, ~15–20 min for all 78 API calls.  
+**Estimated cost**: ~$5–$8 at claude-opus-4.6 2026-03 pricing (minimum ~$4, up to ~$10
+depending on implementation size).
+
 ### Experiment A — Seeded-Bug Review Accuracy
-- Inject 3-5 seeded logic bugs into successful Python and Rust runs
+- Inject exactly 3 seeded logic bugs into successful Python and Rust runs
 - Non-agentic Claude review (single-pass, no tool use)
 - Measure: defect detection rate, false positive rate, review token cost
 - Tests falsifiability condition F1

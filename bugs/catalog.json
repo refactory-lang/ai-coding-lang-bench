@@ -1,0 +1,110 @@
+[
+  {
+    "id": "PY-OBO-LOG",
+    "category": "off-by-one",
+    "language": "python",
+    "description": "Log iterator stops one commit early — fencepost error in parent-chain traversal.",
+    "affected_commands": ["log"],
+    "test_impact": "Fails multi-entry log tests; first-commit log still passes.",
+    "injection_strategy": "Find the while-loop that walks the parent chain for 'log' (pattern: `while parent` or `while current` or `while commit`). Add a depth counter and change the stop condition to terminate one step early, e.g. change `while parent:` to `while parent and depth < max_depth - 1:` where max_depth is set to a large constant like 9999, so the loop exits before reaching the oldest commit. Insert `depth = 0` before the loop and `depth += 1` inside it."
+  },
+  {
+    "id": "PY-HASH-SEED",
+    "category": "wrong-hash-seed",
+    "language": "python",
+    "description": "Commit hash seeded with wrong initial value — SHA-1 digest collides across commits.",
+    "affected_commands": ["commit", "log", "show"],
+    "test_impact": "Fails tests that verify commit hash uniqueness or specific hash values.",
+    "injection_strategy": "Find the function that computes or creates a commit hash (typically calls hashlib.sha1 or similar). Change the data fed to the hash so that it uses a fixed seed or omits a variable field. For example, if the code does `hashlib.sha1(f'{tree}{parent}{message}'.encode())`, change it to `hashlib.sha1(f'{tree}{message}'.encode())` (omit the parent), causing hash collisions when the same message is reused."
+  },
+  {
+    "id": "PY-STATUS-STAGE",
+    "category": "wrong-status",
+    "language": "python",
+    "description": "Status command misreports staged files as unstaged — index comparison uses wrong baseline.",
+    "affected_commands": ["status"],
+    "test_impact": "Fails tests that verify staged file listing; unstaged detection still works.",
+    "injection_strategy": "Find the status function that compares the index to HEAD (or working tree). Swap the comparison baseline so that staged files are compared against the working tree instead of HEAD, or vice versa. For example, change `if file in index and index[file] != head.get(file)` to `if file in index and index[file] != working_tree.get(file)`, making staged files appear as unmodified."
+  },
+  {
+    "id": "PY-PARENT-NULL",
+    "category": "missing-parent",
+    "language": "python",
+    "description": "First commit stored without parent field — subsequent log traversal raises AttributeError.",
+    "affected_commands": ["commit", "log"],
+    "test_impact": "Fails log traversal after first commit; single-commit repos still work.",
+    "injection_strategy": "Find where a commit object is created or serialised (e.g. a dict or dataclass). Remove or set to empty-string the parent field for commits that follow the initial commit. For example, change `'parent': parent_hash` to `'parent': ''` unconditionally, so every commit appears to be a root commit and log cannot chain backwards."
+  },
+  {
+    "id": "PY-INDEX-FLUSH",
+    "category": "index-not-flushed",
+    "language": "python",
+    "description": "Index changes written to in-memory dict but never persisted — add/rm changes lost on exit.",
+    "affected_commands": ["add", "rm", "status"],
+    "test_impact": "Fails tests that verify persistence of staged files across process restarts.",
+    "injection_strategy": "Find the function that writes the index to disk (e.g. writes a JSON or binary file to .git/index). Remove the write call (or comment it out), so the in-memory index is updated but the on-disk index remains stale. The tool appears to work within a single run but loses state between invocations."
+  },
+  {
+    "id": "PY-DIFF-BASE",
+    "category": "wrong-diff-base",
+    "language": "python",
+    "description": "Diff compares working tree against wrong base — always diffs against initial commit.",
+    "affected_commands": ["diff"],
+    "test_impact": "Fails diff tests after more than one commit; first-commit diff still correct.",
+    "injection_strategy": "Find the diff function that resolves the base commit or tree. Change the commit pointer so it always resolves to the root/initial commit instead of HEAD or the specified revision. For example, change `base = self.resolve_ref('HEAD')` to `base = self.get_initial_commit()`, or replace a variable containing the current HEAD hash with the first commit hash in the log."
+  },
+  {
+    "id": "RS-OBO-LOG",
+    "category": "off-by-one",
+    "language": "rust",
+    "description": "Log iterator stops one commit early — fencepost error in parent-chain traversal.",
+    "affected_commands": ["log"],
+    "test_impact": "Fails multi-entry log tests; single-commit log still passes.",
+    "injection_strategy": "Find the loop or iterator that walks the parent chain for the log command (pattern: `while let Some(hash) = current` or `loop { ... parent }`). Add a depth counter and change the loop to exit one step early by adding a condition like `if depth >= usize::MAX - 1 { break; }` just before updating the current pointer, where the counter is initialised to 0 and incremented each iteration. This causes the loop to miss the oldest commit."
+  },
+  {
+    "id": "RS-HASH-SEED",
+    "category": "wrong-hash-seed",
+    "language": "rust",
+    "description": "Commit hash seeded with wrong initial value — SHA-1 digest collides across commits.",
+    "affected_commands": ["commit", "log", "show"],
+    "test_impact": "Fails tests that verify commit hash uniqueness or specific hash values.",
+    "injection_strategy": "Find the function that hashes commit data (typically passes a string or bytes to a SHA-1 or similar hasher). Change the input so that the parent hash field is excluded from the digest. For example, if the code formats `format!('{}{}{}', tree, parent, message)`, change it to `format!('{}{}', tree, message)` so commits with the same tree and message always produce the same hash regardless of parent."
+  },
+  {
+    "id": "RS-STATUS-STAGE",
+    "category": "wrong-status",
+    "language": "rust",
+    "description": "Status command misreports staged files as unstaged — index comparison uses wrong baseline.",
+    "affected_commands": ["status"],
+    "test_impact": "Fails tests that verify staged file listing; unstaged detection still works.",
+    "injection_strategy": "Find the status function that partitions files into staged vs unstaged by comparing the index to HEAD. Swap the comparison so staged files are compared against the working tree instead of HEAD. For example, change a comparison of `index_hash != head_hash` to `index_hash != working_hash`, so files staged for commit appear as unmodified."
+  },
+  {
+    "id": "RS-PARENT-NULL",
+    "category": "missing-parent",
+    "language": "rust",
+    "description": "First commit stored without parent field — subsequent log traversal raises a panic.",
+    "affected_commands": ["commit", "log"],
+    "test_impact": "Fails log traversal after first commit; single-commit repos still work.",
+    "injection_strategy": "Find where a Commit struct or serialised commit object is constructed. Change the parent field assignment so it is always set to None or an empty string regardless of whether a parent exists. For example, change `parent: Some(head_hash)` to `parent: None`, so the log can never chain backwards beyond the most recent commit."
+  },
+  {
+    "id": "RS-INDEX-FLUSH",
+    "category": "index-not-flushed",
+    "language": "rust",
+    "description": "Index changes written to in-memory HashMap but never persisted — add/rm changes lost on exit.",
+    "affected_commands": ["add", "rm", "status"],
+    "test_impact": "Fails tests that verify persistence of staged files across process restarts.",
+    "injection_strategy": "Find the function that serialises and writes the index to disk (e.g. writes JSON or binary to .git/index). Remove or comment out the file-write call so that the in-memory HashMap is modified correctly but the on-disk index is never updated. The implementation behaves correctly within a single invocation but loses staged changes between runs."
+  },
+  {
+    "id": "RS-DIFF-BASE",
+    "category": "wrong-diff-base",
+    "language": "rust",
+    "description": "Diff compares working tree against wrong base — always diffs against initial commit.",
+    "affected_commands": ["diff"],
+    "test_impact": "Fails diff tests after more than one commit; first-commit diff still correct.",
+    "injection_strategy": "Find the diff function that resolves the base commit or tree object. Change the commit resolution so it always uses the root or initial commit instead of HEAD or the requested revision. For example, replace `self.resolve_head()` with `self.get_first_commit()`, or replace the variable holding the current HEAD hash with the hash of the chronologically first commit stored in the repository."
+  }
+]
