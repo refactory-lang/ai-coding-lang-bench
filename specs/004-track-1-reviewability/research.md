@@ -95,8 +95,9 @@ system prompt of ~500 tokens and output of up to 4096 tokens:
 - Input tokens per review: ~1 000 – 2 000
 - Output tokens per review: ~500 – 1 500
 - Total per run: ~1 500 – 3 500 tokens  
-- 39 runs × 2 conditions × 3 500 ≈ **273 000 tokens max** (~$1.10 at
-  claude-opus-4.6 pricing as of 2026-03)
+- 39 runs × 2 conditions × 3 500 ≈ **273 000 tokens max** (~$5–$8 at
+  claude-opus-4.6 pricing as of 2026-03; minimum ~$4 at 1 500 tokens/call,
+  mid-range ~$8 at 3 500 tokens/call)
 
 ### Retry Policy (FR-003a)
 Exponential backoff: attempt 1 → wait 2 s → attempt 2 → wait 4 s → attempt 3
@@ -124,8 +125,14 @@ window is a TP for **all** bugs in that window (per spec clarification).
 ### Formulas
 - **DDR** (Defect Detection Rate) = TP / total_bugs (per run; average across
   runs for the condition).
-- **FPR** (False Positive Rate) = FP / (FP + TN) where TN = non-injected
-  locations not flagged. Proxy: FP count / (FP + total_bugs − TP).
+- **FPR** (False Positive Rate, classical) = FP / (FP + TN) where TN = number
+  of distinct non-injected regions (file × 10-line window) not flagged by the
+  reviewer. TN is bounded and computable from the source file length and the
+  bug manifest.
+- **noise_ratio** (project-specific proxy) = FP / (FP + FN). Answers "of all
+  incorrect reviewer outputs, what fraction were spurious flags?" Useful for
+  comparing noise level across conditions; not comparable to classical FPR in
+  external literature.
 
 ### Determinism
 The scorer reads only persisted artifacts (manifest JSON + review response

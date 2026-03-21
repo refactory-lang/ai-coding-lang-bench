@@ -81,7 +81,7 @@ T005[P], T006[P], T007  (parallel start: all three independent)
 
 - [ ] T005 [P] [US1] Create review/prompts/unconstrained.txt containing the reviewer system prompt: expert logic-error-only review, structured output format `**Finding N**: <file_path>, lines <start>–<end>` followed by one-sentence description; no fix suggestions; no style comments
 
-- [ ] T006 [P] [US1] Create review/pricing.json mapping Anthropic model strings to per-1k-token USD prices; must include at minimum `claude-opus-4.6` (`input_per_1k: 0.015`, `output_per_1k: 0.075`) and `claude-sonnet-4-5` (`input_per_1k: 0.003`, `output_per_1k: 0.015`); update to current Anthropic pricing before running the experiment
+- [ ] T006 [P] [US1] Create review/pricing.json mapping Anthropic model strings to per-1k-token USD prices; must include at minimum `claude-opus-4.6` (`input_per_1k: 0.015`, `output_per_1k: 0.075`) and `claude-sonnet-4.5` (`input_per_1k: 0.003`, `output_per_1k: 0.015`); update to current Anthropic pricing before running the experiment
 
 - [ ] T007 [US1] Implement bugs/inject.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: copy source to output dir, load catalog, select 3 bugs via `--bugs` list or PRNG seed, apply `injection_strategy` transformations, verify compilation, write `BugManifest` JSON to `--manifest-path` (FR-001, FR-002, FR-008, FR-009)
 
@@ -102,21 +102,21 @@ T005[P], T006[P], T007  (parallel start: all three independent)
   *Runner*: `python3 -m pytest review/test_harness.py -v`  
   *Note*: no real API calls; mock via `unittest.mock.patch`
 
-- [ ] T011 [US1] Implement review/score.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: load `BugManifest` and `ReviewResponse`, apply location-based matching (`finding.file_path == bug.file_path AND |finding.line_start - bug.line_number| <= line_tolerance`, default 5), apply co-location rule (finding matching a shared window is TP for all bugs at that location), classify remaining findings as FP, compute `tp_count`, `fp_count`, `fn_count = total_bugs - tp_count`, `ddr = tp_count / total_bugs`, `fpr = fp_count / (fp_count + fn_count)` (0 when denominator is 0), copy token fields from `ReviewResponse`, write `RunMetrics` JSON; if `ReviewResponse.missing_data == true` write metrics with `missing_data: true`, `ddr: null`, `fpr: null` (FR-005, FR-008)
+- [ ] T011 [US1] Implement review/score.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: load `BugManifest` and `ReviewResponse`, apply location-based matching (`finding.file_path == bug.file_path AND |finding.line_start - bug.line_number| <= line_tolerance`, default 5), apply co-location rule (finding matching a shared window is TP for all bugs at that location), classify remaining findings as FP, compute `tp_count`, `fp_count`, `fn_count = total_bugs - tp_count`, `tn_count` (count of non-injected file regions — file × 10-line window — not flagged by any finding), `ddr = tp_count / total_bugs`, `fpr = fp_count / (fp_count + tn_count)` (classical; 0 when denominator is 0), `noise_ratio = fp_count / (fp_count + fn_count)` (project proxy; 0 when denominator is 0), copy token fields from `ReviewResponse`, write `RunMetrics` JSON; if `ReviewResponse.missing_data == true` write metrics with `missing_data: true`, `ddr: null`, `fpr: null`, `noise_ratio: null` (FR-005, FR-008)
 
   *Flags*: `--manifest-path`, `--review-path`, `--output-path`, `[--line-tolerance 5]`  
   *Exit code*: always 0 (missing data is a valid outcome, not an error)  
   *Output path convention*: `experiments/track1/metrics/{lang}-{trial}-v2-{condition}.json`
 
-- [ ] T012 [US1] Write review/test_score.py unit tests covering: (1) all 3 bugs detected — 3 matching findings → `ddr=1.0`, `fp_count=0`; (2) no findings — `ddr=0.0`, `fpr=0.0`; (3) partial detection — 1 of 3 bugs found, 2 FPs → `ddr≈0.333`, `fp_count=2`; (4) co-located bugs — 2 bugs at line 87; 1 finding at line 87 → both TPs, `tp_count=2`; (5) line tolerance pass — bug at line 87; finding at line 90; tolerance=5 → TP; (6) line tolerance exceeded — bug at line 87; finding at line 93; tolerance=5 → FP; (7) null `line_start` in finding — classified as FP; (8) missing data propagation — `ReviewResponse.missing_data=true` → `RunMetrics.ddr=null`, `RunMetrics.fpr=null`
+- [ ] T012 [US1] Write review/test_score.py unit tests covering: (1) all 3 bugs detected — 3 matching findings → `ddr=1.0`, `fp_count=0`, `noise_ratio=0.0`; (2) no findings — `ddr=0.0`, `fpr=0.0`, `noise_ratio=0.0`; (3) partial detection — 1 of 3 bugs found, 2 FPs → `ddr≈0.333`, `fp_count=2`, `noise_ratio≈0.5`; (4) co-located bugs — 2 bugs at line 87; 1 finding at line 87 → both TPs, `tp_count=2`; (5) line tolerance pass — bug at line 87; finding at line 90; tolerance=5 → TP; (6) line tolerance exceeded — bug at line 87; finding at line 93; tolerance=5 → FP; (7) null `line_start` in finding — classified as FP; (8) missing data propagation — `ReviewResponse.missing_data=true` → `RunMetrics.ddr=null`, `RunMetrics.fpr=null`, `RunMetrics.noise_ratio=null`; (9) tn_count computed correctly — seeded file has N non-injected regions, none flagged → `tn_count=N`, `fpr=0.0`
 
   *Runner*: `python3 -m pytest review/test_score.py -v`
 
 ---
 
-## Phase 4: User Story 2 — Constrained Python Review / Experiment B (P2)
+## Phase 4: User Story 2 — Constrained Review / Experiment B (P2)
 
-> **Story goal**: Run the same seeded Python implementations through the review harness under the Refactory-profile ("Python-as-Rust") constraint and confirm the output is structurally identical to Experiment A, enabling direct DDR/FPR comparison.
+> **Story goal**: Run the same seeded Python and Rust implementations through the review harness under the Refactory-profile ("Python-as-Rust") constraint and confirm the output is structurally identical to Experiment A, enabling direct DDR/FPR/noise_ratio comparison.
 >
 > **Independent test**: Run the harness on one seeded Python implementation with `--condition refactory-profile` and confirm the ReviewResponse JSON schema matches Experiment A output exactly.
 
@@ -137,10 +137,10 @@ T005[P], T006[P], T007  (parallel start: all three independent)
 - [ ] T015 [P] [US3] Implement analysis/token_analysis.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: recursively scan `--reviews-dir` for `*.json` files (both `unconstrained/` and `refactory-profile/` subdirs), parse as `ReviewResponse`, extract `run_id`, `condition`, `language`, `trial`, `input_tokens`, `output_tokens`, `estimated_cost_usd`, `missing_data`, write per-run CSV to `--output-csv` and per-group summary JSON to `--output-summary`; aggregate groups by `(language, condition)` computing `n_runs`, `n_missing`, `mean`/`std` for token and cost fields, and sums (FR-006)
 
   *Flags*: `--reviews-dir`, `--output-csv`, `--output-summary`  
-  *Expected output*: per-run CSV (one row per `ReviewResponse` file found) and per-group summary JSON. Per spec, Experiment A covers all 39 implementations (Python + Rust, unconstrained), and Experiment B covers only the 20 Python implementations (refactory-profile) — so the full CSV has 59 rows (20 + 19 + 20) and the summary has 3 populated groups: `python/unconstrained`, `python/refactory-profile`, `rust/unconstrained`. The `rust/refactory-profile` group may appear with `n_runs: 0` or be omitted; either is acceptable provided the tool handles an empty directory without error. *(Note: plan.md mentions 78 calls = 39 × 2 conditions, which would include Rust under Exp B; if the experiment scope is extended to Rust, this row count increases to 78 and all 4 groups are populated. The tool must handle both sizes without code changes.)*  
+  *Expected output*: per-run CSV (one row per `ReviewResponse` file found) and per-group summary JSON. Experiment A covers all 39 implementations (Python + Rust, unconstrained) and Experiment B covers all 39 implementations (Python + Rust, refactory-profile) — so the full CSV has 78 rows (39 + 39) and the summary has 4 populated groups: `python/unconstrained`, `python/refactory-profile`, `rust/unconstrained`, `rust/refactory-profile`. The tool must handle any subset of these directories without error, producing partial results for partial inputs.  
   *Stdlib only*: no external dependencies beyond `csv`, `json`, `statistics`, `pathlib`
 
-- [ ] T016 [P] [US3] Write analysis/test_token_analysis.py covering: (1) happy path — 3 mock `ReviewResponse` files → CSV has 3 rows, summary means are correct; (2) missing data excluded from means — 1 missing + 2 valid → means over 2 only, `n_missing: 1`; (3) group aggregation — 2 languages × 2 conditions → 4 summary entries; (4) empty input — no JSON files → empty CSV header row, empty summary array
+- [ ] T016 [P] [US3] Write analysis/test_token_analysis.py covering: (1) happy path — 3 mock `ReviewResponse` files → CSV has 3 rows, summary means are correct; (2) missing data excluded from means — 1 missing + 2 valid → means over 2 only, `n_missing: 1`; (3) group aggregation — 2 languages × 2 conditions → 4 summary entries; (4) empty input — no JSON files → empty CSV header row, empty summary array; (5) all 4 groups populated when 78 responses present (39 unconstrained + 39 refactory-profile across Python and Rust)
 
   *Runner*: `python3 -m pytest analysis/test_token_analysis.py -v`
 
@@ -150,11 +150,11 @@ T005[P], T006[P], T007  (parallel start: all three independent)
 
 > **Goal**: Reporting, end-to-end orchestration, and documentation sufficient for a new contributor to reproduce results without reading source code (SC-006).
 
-- [ ] T017 [P] Implement review/report.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: aggregate `RunMetrics` files into `ExperimentSummary` tables and render four Markdown reports under `--output-dir` — `experiment-a.md` (DDR/FPR for unconstrained, both languages), `experiment-b.md` (DDR/FPR for refactory-profile, Python only), `experiment-h.md` (token cost analysis: per-group mean input tokens, output tokens, mean cost, total cost, absolute and % difference between conditions), `comparison-table.md` (side-by-side DDR, FPR, mean cost for all conditions — must show ≥ 2 languages and ≥ 2 conditions per SC-005); missing-data runs noted with "(N missing)" in each table; re-running on unchanged inputs produces identical output (FR-007)
+- [ ] T017 [P] Implement review/report.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: aggregate `RunMetrics` files into `ExperimentSummary` tables and render four Markdown reports under `--output-dir` — `experiment-a.md` (DDR/FPR/noise_ratio for unconstrained, both languages), `experiment-b.md` (DDR/FPR/noise_ratio for refactory-profile, both languages), `experiment-h.md` (token cost analysis: per-group mean input tokens, output tokens, mean cost, total cost, absolute and % difference between conditions), `comparison-table.md` (side-by-side DDR, FPR, noise_ratio, mean cost for all 4 conditions — must show ≥ 2 languages and ≥ 2 conditions per SC-005); missing-data runs noted with "(N missing)" in each table; re-running on unchanged inputs produces identical output (FR-007)
 
   *Flags*: `--metrics-dir`, `--token-summary`, `--output-dir`
 
-- [ ] T018 [P] Write review/test_report.py covering: (1) experiment-a.md renders correctly — 2 RunMetrics inputs (python, rust) → table has 2 language rows with correct DDR values; (2) missing data noted in report — 1 missing run → "(1 missing)" appears in the relevant table; (3) experiment-h.md cost comparison — unconstrained $0.08/run, refactory $0.09/run → delta column shows +$0.01 (+12.5%); (4) comparison-table.md columns — `Language`, `Condition`, `DDR`, `FPR`, `Mean Cost (USD)` all present
+- [ ] T018 [P] Write review/test_report.py covering: (1) experiment-a.md renders correctly — 2 RunMetrics inputs (python, rust) → table has 2 language rows with correct DDR and noise_ratio values; (2) missing data noted in report — 1 missing run → "(1 missing)" appears in the relevant table; (3) experiment-h.md cost comparison — unconstrained $0.08/run, refactory $0.09/run → delta column shows +$0.01 (+12.5%); (4) comparison-table.md columns — `Language`, `Condition`, `DDR`, `FPR`, `noise_ratio`, `Mean Cost (USD)` all present
 
   *Runner*: `python3 -m pytest review/test_report.py -v`
 
@@ -167,7 +167,7 @@ T005[P], T006[P], T007  (parallel start: all three independent)
 
   *Acceptance*: a reviewer unfamiliar with the codebase can execute the pipeline following this guide without consulting source code (SC-006)
 
-- [ ] T021 Update EXPERIMENTS.md with a "Running Track 1" section under the Track 1 heading: include the single `run-track1.sh` command for end-to-end execution, link to `specs/004-track-1-reviewability/quickstart.md`, note expected runtime (~5 min for injection + scoring, ~15–20 min for 78 API calls) and estimated API cost (~$1.10 at claude-opus-4.6 2026-03 pricing)
+- [ ] T021 Update EXPERIMENTS.md with a "Running Track 1" section under the Track 1 heading: include the single `run-track1.sh` command for end-to-end execution, link to `specs/004-track-1-reviewability/quickstart.md`, note expected runtime (~5 min for injection + scoring, ~15–20 min for 78 API calls) and estimated API cost (~$5–$8 at claude-opus-4.6 2026-03 pricing; minimum ~$4, up to ~$10 depending on implementation size)
 
 ---
 
@@ -260,7 +260,7 @@ T017[P] and T018[P] in parallel
 6. T015–T016: US3 is purely analytical; can be developed before Exp A/B data exists
 7. T017–T021: Reports and orchestration are the final integration layer
 
-**Cost gating**: Run `bash run-track1.sh --dry-run` after T019 to validate the full command sequence before committing to the ~$1.10 API spend.
+**Cost gating**: Run `bash run-track1.sh --dry-run` after T019 to validate the full command sequence before committing to the ~$5–$8 API spend.
 
 ---
 

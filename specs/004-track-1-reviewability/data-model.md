@@ -194,8 +194,10 @@ Produced by `review/score.py`. Stored at
   "tp_count": 2,
   "fp_count": 1,
   "fn_count": 1,
+  "tn_count": 42,
   "ddr": 0.6667,
-  "fpr": 0.3333,
+  "fpr": 0.0233,
+  "noise_ratio": 0.3333,
   "input_tokens": 1842,
   "output_tokens": 743,
   "estimated_cost_usd": 0.0834,
@@ -213,8 +215,10 @@ Produced by `review/score.py`. Stored at
 | `tp_count` | integer | 0–3 |
 | `fp_count` | integer | ≥ 0 |
 | `fn_count` | integer | `total_bugs - tp_count` |
+| `tn_count` | integer | Count of non-injected file regions (file × 10-line window) not flagged; used for classical FPR |
 | `ddr` | float | `tp_count / total_bugs`; range [0, 1] |
-| `fpr` | float | `fp_count / (fp_count + total_bugs - tp_count)` when denominator > 0; `0` otherwise |
+| `fpr` | float | Classical: `fp_count / (fp_count + tn_count)` when denominator > 0; `0` otherwise |
+| `noise_ratio` | float | Project proxy: `fp_count / (fp_count + fn_count)` when denominator > 0; `0` otherwise |
 | `input_tokens` | integer | From ReviewResponse |
 | `output_tokens` | integer | From ReviewResponse |
 | `estimated_cost_usd` | float | From ReviewResponse |
@@ -241,8 +245,10 @@ Produced by `review/report.py`. Stored in `experiments/track1/reports/`.
   "n_missing": 0,
   "mean_ddr": 0.72,
   "std_ddr": 0.18,
-  "mean_fpr": 0.15,
-  "std_fpr": 0.11,
+  "mean_fpr": 0.021,
+  "std_fpr": 0.009,
+  "mean_noise_ratio": 0.15,
+  "std_noise_ratio": 0.11,
   "mean_cost_usd": 0.081,
   "std_cost_usd": 0.012,
   "total_input_tokens": 36840,
@@ -259,8 +265,10 @@ Produced by `review/report.py`. Stored in `experiments/track1/reports/`.
 | `n_missing` | integer | Count of `missing_data: true` runs |
 | `mean_ddr` | float | [0, 1]; computed over non-missing runs |
 | `std_ddr` | float | ≥ 0 |
-| `mean_fpr` | float | [0, 1] |
+| `mean_fpr` | float | [0, 1]; classical FPR; computed over non-missing runs |
 | `std_fpr` | float | ≥ 0 |
+| `mean_noise_ratio` | float | [0, 1]; project proxy metric |
+| `std_noise_ratio` | float | ≥ 0 |
 | `mean_cost_usd` | float | ≥ 0 |
 | `std_cost_usd` | float | ≥ 0 |
 | `total_input_tokens` | integer | Sum across all runs in group |
@@ -285,8 +293,8 @@ ReviewResponse (one per implementation × condition)
 RunMetrics (one per implementation × condition)
     └─ aggregated by ────▶ report.py to produce ExperimentSummary (A, B)
 
-ExperimentSummary × 4 (python/unconstrained, python/refactory,
-                        rust/unconstrained)
+ExperimentSummary × 4 (python/unconstrained, python/refactory-profile,
+                        rust/unconstrained, rust/refactory-profile)
     └─ compared by ──────▶ report.py comparison-table.md (SC-005)
 ```
 

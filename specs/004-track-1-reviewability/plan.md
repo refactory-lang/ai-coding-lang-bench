@@ -16,7 +16,7 @@
 | API provider | Anthropic Claude (default model: `claude-opus-4.6`, configurable) |
 | Conditions | `unconstrained` (Exp A), `refactory-profile` (Exp B) |
 | Total review API calls | 39 × 2 conditions = **78 calls** |
-| Estimated token cost | ~$1.10 total at 2026-03 claude-opus pricing |
+| Estimated token cost | ~$5–$8 total at 2026-03 claude-opus-4.6 pricing |
 | Retry policy | 3× exponential backoff (2 s / 4 s / 8 s) |
 | Tooling language | Python 3.9+ (stdlib + `anthropic` SDK) |
 | Orchestration | Bash (`run-track1.sh`) |
@@ -65,7 +65,7 @@ detail. Key decisions:
    scored independently against the shared window.
 6. **Refactory profile**: Additional system-prompt segment instructing the
    reviewer to apply Rust ownership/safety norms when reviewing Python.
-7. **Token cost**: ~$1.10 estimated for all 78 review calls.
+7. **Token cost**: ~$5–$8 estimated for all 78 review calls.
 
 ---
 
@@ -138,7 +138,7 @@ In addition to these, also flag all logic errors as described below.
 ```json
 {
   "claude-opus-4.6": { "input_per_1k": 0.015, "output_per_1k": 0.075 },
-  "claude-sonnet-4-5": { "input_per_1k": 0.003, "output_per_1k": 0.015 }
+  "claude-sonnet-4.5": { "input_per_1k": 0.003, "output_per_1k": 0.015 }
 }
 ```
 
