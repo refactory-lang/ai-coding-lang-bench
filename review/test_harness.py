@@ -264,30 +264,66 @@ def test_exhausted_retries_produces_missing_data(tmp_path):
 
 def test_auth_error_no_retry(tmp_path):
     """
-    AuthenticationError should set missing_data immediately without retrying.
+    AuthenticationError (detected by class name or message substring) must
+    set missing_data immediately without retrying — only 1 API call attempt,
+    output JSON has missing_data=true, and harness exits with code 1.
     """
-    mock_client = MagicMock()
+    import types
 
-    class FakeAuthError(Exception):
-        pass
+    seeded_dir = make_seeded_dir(tmp_path)
+    manifest_path = make_manifest(tmp_path)
+    output_path = tmp_path / "reviews" / "unconstrained" / "python-1-v2.json"
+    output_path.parent.mkdir(parents=True)
 
     call_count = {"n": 0}
 
+    class AuthenticationError(Exception):
+        """Named exactly 'AuthenticationError' to match harness terminal_names set."""
+        pass
+
     def side_effect(*args, **kwargs):
         call_count["n"] += 1
-        raise FakeAuthError("Invalid API key")
+        raise AuthenticationError("Invalid API key")
 
+    mock_client = MagicMock()
     mock_client.messages.create.side_effect = side_effect
 
-    # Simulate terminal error handling: auth errors are detected by name
-    terminal_names = {"AuthenticationError", "InvalidRequestError", "PermissionDeniedError"}
-    exc_type_name = "FakeAuthError"
-    is_auth = exc_type_name in terminal_names or "authentication" in "Invalid API key".lower()
+    # Build a minimal fake 'anthropic' module so harness.main()'s `import anthropic` succeeds
+    # in environments where the package is not installed.
+    fake_anthropic = types.ModuleType("anthropic")
+    fake_anthropic.Anthropic = MagicMock(return_value=mock_client)
 
-    # auth in message triggers terminal path even for unknown exception class
-    assert is_auth is False  # FakeAuthError not in terminal set, message check...
-    # In the real harness, 'authentication' in str(exc) triggers terminal
-    assert "authentication" in "Invalid API key".lower() or not is_auth
+    saved = sys.modules.get("anthropic")
+    try:
+        sys.modules["anthropic"] = fake_anthropic
+        with patch.object(sys, "argv", [
+            "harness.py",
+            "--seeded-dir", str(seeded_dir),
+            "--manifest-path", str(manifest_path),
+            "--output-path", str(output_path),
+            "--condition", "unconstrained",
+            "--model", "claude-opus-4.6",
+        ]), patch("harness.time") as mock_time, \
+           patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with pytest.raises(SystemExit) as exc_info:
+                harness.main()
+    finally:
+        if saved is None:
+            sys.modules.pop("anthropic", None)
+        else:
+            sys.modules["anthropic"] = saved
+
+    # Terminal error → exit code 1 (not 2)
+    assert exc_info.value.code == 1, f"Expected exit 1, got {exc_info.value.code}"
+    # No retry: only 1 API call should have been made
+    assert call_count["n"] == 1, f"Expected 1 call attempt, got {call_count['n']}"
+    # No sleep between attempts
+    mock_time.sleep.assert_not_called()
+    # Output file written with missing_data: true
+    assert output_path.exists(), "Output JSON should be written even on terminal error"
+    written = json.loads(output_path.read_text(encoding="utf-8"))
+    assert written["missing_data"] is True
+    assert written.get("missing_data_reason") is not None
 
 
 # ---------------------------------------------------------------------------

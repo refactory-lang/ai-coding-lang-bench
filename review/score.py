@@ -34,6 +34,21 @@ def load_json(path: Path) -> dict:
         return json.load(fh)
 
 
+def _count_file_lines(seeded_dir: str, file_path: str) -> int:
+    """
+    Return the actual line count for a file in the seeded directory.
+    Falls back to DEFAULT_FILE_LINES if the directory or file is unavailable.
+    """
+    if not seeded_dir:
+        return DEFAULT_FILE_LINES
+    full_path = Path(seeded_dir) / file_path
+    try:
+        text = full_path.read_text(encoding="utf-8", errors="replace")
+        return max(len(text.splitlines()), 1)
+    except OSError:
+        return DEFAULT_FILE_LINES
+
+
 def compute_tn_count(manifest: dict, review: dict, matched_findings: set) -> int:
     """
     Compute the true negative count.
@@ -41,12 +56,13 @@ def compute_tn_count(manifest: dict, review: dict, matched_findings: set) -> int
     TN = number of non-injected 10-line windows in the seeded files that
     were NOT flagged by any finding.
 
-    We approximate the total number of windows from the manifest's file
-    information. For each injected bug we know the file and line number.
-    We compute the union of all files mentioned in the manifest, estimate
-    their size, divide into 10-line windows, subtract injected-bug windows
-    and flagged (FP) windows to get the TN count.
+    File line counts are read from the actual seeded sources recorded in the
+    manifest's ``seeded_dir`` field.  When that directory is unavailable
+    (e.g. during unit tests with synthetic manifests), a heuristic fallback
+    of DEFAULT_FILE_LINES is used and TN should be treated as approximate.
     """
+    seeded_dir = manifest.get("seeded_dir", "")
+
     # Collect injected bug windows {(file, window_idx)}
     injected_windows = set()
     file_to_bugs = {}
@@ -57,19 +73,17 @@ def compute_tn_count(manifest: dict, review: dict, matched_findings: set) -> int
         injected_windows.add((fp, window_idx))
         file_to_bugs.setdefault(fp, []).append(bug)
 
-    # Estimate file sizes: use max(line_number + WINDOW_SIZE, DEFAULT_FILE_LINES)
-    file_sizes = {}
-    for bug in manifest.get("bugs", []):
-        fp = bug["file_path"]
-        ln = bug.get("line_number", 1)
-        file_sizes[fp] = max(file_sizes.get(fp, DEFAULT_FILE_LINES), ln + WINDOW_SIZE)
-
-    # Also consider files mentioned in findings but not in manifest
+    # Collect all files referenced in bugs and findings
+    all_files: set = set(file_to_bugs.keys())
     for finding in review.get("findings", []):
         fp = finding.get("file_path", "")
-        ls = finding.get("line_start")
-        if ls and fp:
-            file_sizes[fp] = max(file_sizes.get(fp, DEFAULT_FILE_LINES), ls + WINDOW_SIZE)
+        if fp:
+            all_files.add(fp)
+
+    # Compute per-file window counts from actual file lengths
+    file_sizes: dict = {}
+    for fp in all_files:
+        file_sizes[fp] = _count_file_lines(seeded_dir, fp)
 
     # Total windows across all files
     total_windows = 0

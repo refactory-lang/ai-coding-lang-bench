@@ -26,7 +26,7 @@ for the step-by-step reproduction guide.
 depending on implementation size).
 
 ### Experiment A — Seeded-Bug Review Accuracy
-- Inject 3-5 seeded logic bugs into successful Python and Rust runs
+- Inject exactly 3 seeded logic bugs into successful Python and Rust runs
 - Non-agentic Claude review (single-pass, no tool use)
 - Measure: defect detection rate, false positive rate, review token cost
 - Tests falsifiability condition F1

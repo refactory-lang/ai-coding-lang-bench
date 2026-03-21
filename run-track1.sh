@@ -106,7 +106,7 @@ except Exception as e:
 for run in results:
     lang = run.get("language", "")
     trial = run.get("trial", "")
-    v2 = run.get("v2_pass", False)
+    v2 = run.get("v2_pass")
     # Include runs that passed v2 (or v1 if v2 not present)
     passed = v2 if v2 is not None else run.get("v1_pass", False)
     if lang in ("python", "rust") and trial and passed:
@@ -219,13 +219,22 @@ for cond in "${CONDITIONS[@]}"; do
       continue
     fi
 
+    review_status=0
     run_cmd python3 "${REPO_ROOT}/review/harness.py" \
       --seeded-dir "${seeded}" \
       --manifest-path "${manifest}" \
       --output-path "${review_out}" \
       --condition "${cond}" \
       --model "${MODEL}" \
-      || true  # exit 2 (missing data) is non-fatal; harness writes the file
+      || review_status=$?
+
+    if [[ "${review_status}" -eq 2 ]]; then
+      # Missing data: non-fatal, harness already wrote the output file
+      N_MISSING=$((N_MISSING + 1))
+    elif [[ "${review_status}" -ne 0 ]]; then
+      # Terminal error (auth, invalid request) — non-fatal for orchestrator
+      echo "  WARN: review harness failed for ${run_id} [${cond}] with exit ${review_status}" >&2
+    fi
 
     N_REVIEWS=$((N_REVIEWS + 1))
   done

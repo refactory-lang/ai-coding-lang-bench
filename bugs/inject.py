@@ -339,7 +339,10 @@ def _inject_off_by_one(lines: list, language: str) -> tuple:
                         new_lines.insert(j + 1, f"{inner_indent}_obo_depth += 1\n")
                         break
                 source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                # Original while was at 0-indexed position i (line i+1).
+                # After inserting init_line at index i, the while shifts to
+                # index i+1 (0-indexed), which is line number i+2 (1-indexed).
+                return source, i + 2, orig, injected
         else:
             # Rust: find while-let loop over parent chain
             m = re.match(r"^(\s*)while let Some\((\w+)\)\s*=\s*(.+)\{?\s*$", line)
@@ -709,34 +712,15 @@ def apply_bugs_to_source(source_dir: Path, output_dir: Path, bugs: list, languag
                 continue  # try next file
 
         if not injected_this_bug:
-            # Fallback: inject a comment-based marker so the manifest is always complete
-            src_file = source_files[0]
-            rel_path = src_file.relative_to(output_dir)
-            source_text = src_file.read_text(encoding="utf-8")
-            lines = source_text.splitlines(keepends=True)
-            # Find a suitable non-empty, non-comment line
-            for i, raw_line in enumerate(lines):
-                line = raw_line.rstrip("\n\r")
-                if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("//"):
-                    orig = line
-                    if language == "python":
-                        inj = line + f"  # BUG:{bug['id']} ({bug['category']})"
-                    else:
-                        inj = line + f"  // BUG:{bug['id']} ({bug['category']})"
-                    lines[i] = inj + "\n"
-                    src_file.write_text("".join(lines), encoding="utf-8")
-                    injections.append(
-                        {
-                            "bug_id": bug["id"],
-                            "category": bug["category"],
-                            "file_path": str(rel_path),
-                            "line_number": i + 1,
-                            "description": bug["description"],
-                            "original_line": orig,
-                            "injected_line": inj,
-                        }
-                    )
-                    break
+            # No injection strategy could be applied for this bug.
+            # Fail the run rather than inserting a non-functional marker comment,
+            # preserving the guarantee that all recorded bugs are real logic bugs.
+            print(
+                f"Error: failed to inject bug {bug['id']} ({bug['category']}) "
+                f"into any {language} source file.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     return injections
 
@@ -760,10 +744,14 @@ def verify_compilation(output_dir: Path, language: str) -> bool:
                 return False
         return True
     else:
-        # Rust: run cargo check if Cargo.toml exists
+        # Rust: run cargo check. Fail if Cargo.toml is missing (can't verify).
         cargo_toml = output_dir / "Cargo.toml"
         if not cargo_toml.exists():
-            return True  # can't check without manifest
+            print(
+                f"Cargo.toml not found in {output_dir}; cannot verify Rust compilation.",
+                file=sys.stderr,
+            )
+            return False
         result = subprocess.run(
             ["cargo", "check", "--manifest-path", str(cargo_toml)],
             capture_output=True,
@@ -846,15 +834,24 @@ def main():
         )
         sys.exit(1)
 
-    # Verify compilation (warn but don't block on Rust if cargo not available)
-    if args.language == "python":
-        if not verify_compilation(output_dir, args.language):
-            print(
-                "Error: seeded implementation fails py_compile. Rolling back.",
-                file=sys.stderr,
+    # Verify compilation for the seeded implementation.
+    # For Python this checks syntax; for Rust this runs cargo check.
+    # If verification fails (including missing cargo/Cargo.toml for Rust), the
+    # seeded output is removed and the run exits non-zero so the orchestrator
+    # treats it as failed.
+    if not verify_compilation(output_dir, args.language):
+        if args.language == "python":
+            msg = "Error: seeded implementation fails py_compile. Rolling back."
+        elif args.language == "rust":
+            msg = (
+                "Error: seeded implementation fails `cargo check` or "
+                "cargo/Cargo.toml is missing. Rolling back."
             )
-            shutil.rmtree(output_dir)
-            sys.exit(1)
+        else:
+            msg = "Error: seeded implementation fails compilation checks. Rolling back."
+        print(msg, file=sys.stderr)
+        shutil.rmtree(output_dir)
+        sys.exit(1)
 
     # Write manifest
     run_id = f"{args.language}-{args.trial}-v2"

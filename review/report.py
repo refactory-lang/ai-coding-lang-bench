@@ -48,16 +48,21 @@ def load_token_summary(token_summary_path: Path) -> list:
 
 def _mean(values: list):
     if not values:
-        return 0.0
+        return None
     return sum(values) / len(values)
 
 
 def _std(values: list):
     if len(values) < 2:
-        return 0.0
+        return None
     m = _mean(values)
     variance = sum((x - m) ** 2 for x in values) / (len(values) - 1)
     return math.sqrt(variance)
+
+
+def _round_or_none(value, ndigits: int):
+    """Round value to ndigits, or return None if value is None."""
+    return round(value, ndigits) if value is not None else None
 
 
 def aggregate_metrics(metrics_list: list, condition: str, language: str) -> dict:
@@ -86,14 +91,14 @@ def aggregate_metrics(metrics_list: list, condition: str, language: str) -> dict
         "language": language,
         "n_runs": n_runs,
         "n_missing": n_missing,
-        "mean_ddr": round(_mean(ddrs), 4),
-        "std_ddr": round(_std(ddrs), 4),
-        "mean_fpr": round(_mean(fprs), 4),
-        "std_fpr": round(_std(fprs), 4),
-        "mean_noise_ratio": round(_mean(nrs), 4),
-        "std_noise_ratio": round(_std(nrs), 4),
-        "mean_cost_usd": round(_mean(costs), 6),
-        "std_cost_usd": round(_std(costs), 6),
+        "mean_ddr": _round_or_none(_mean(ddrs), 4),
+        "std_ddr": _round_or_none(_std(ddrs), 4),
+        "mean_fpr": _round_or_none(_mean(fprs), 4),
+        "std_fpr": _round_or_none(_std(fprs), 4),
+        "mean_noise_ratio": _round_or_none(_mean(nrs), 4),
+        "std_noise_ratio": _round_or_none(_std(nrs), 4),
+        "mean_cost_usd": _round_or_none(_mean(costs), 6),
+        "std_cost_usd": _round_or_none(_std(costs), 6),
         "total_input_tokens": sum(in_tokens),
         "total_output_tokens": sum(out_tokens),
         "total_cost_usd": round(sum(costs), 6),
@@ -102,6 +107,15 @@ def aggregate_metrics(metrics_list: list, condition: str, language: str) -> dict
 
 def _fmt_missing(n_missing: int) -> str:
     return f" ({n_missing} missing)" if n_missing > 0 else ""
+
+
+def _fmt_metric(mean_val, std_val, fmt: str = ".4f") -> str:
+    """Format mean ± std, rendering N/A when either value is None."""
+    if mean_val is None:
+        return "N/A"
+    if std_val is None:
+        return f"{mean_val:{fmt}}"
+    return f"{mean_val:{fmt}} ± {std_val:{fmt}}"
 
 
 def render_experiment_a(metrics_list: list) -> str:
@@ -126,10 +140,10 @@ def render_experiment_a(metrics_list: list) -> str:
         missing_note = _fmt_missing(s["n_missing"])
         lang = s["language"].capitalize()
         n_label = f"{s['n_runs']}{missing_note}"
-        ddr = f"{s['mean_ddr']:.4f} ± {s['std_ddr']:.4f}"
-        fpr = f"{s['mean_fpr']:.4f} ± {s['std_fpr']:.4f}"
-        nr = f"{s['mean_noise_ratio']:.4f} ± {s['std_noise_ratio']:.4f}"
-        cost = f"${s['mean_cost_usd']:.4f}"
+        ddr = _fmt_metric(s["mean_ddr"], s["std_ddr"])
+        fpr = _fmt_metric(s["mean_fpr"], s["std_fpr"])
+        nr = _fmt_metric(s["mean_noise_ratio"], s["std_noise_ratio"])
+        cost = f"${s['mean_cost_usd']:.4f}" if s["mean_cost_usd"] is not None else "N/A"
         lines.append(f"| {lang} | {n_label} | {ddr} | {fpr} | {nr} | {cost} |")
 
     if not summaries:
@@ -172,10 +186,10 @@ def render_experiment_b(metrics_list: list) -> str:
         missing_note = _fmt_missing(s["n_missing"])
         lang = s["language"].capitalize()
         n_label = f"{s['n_runs']}{missing_note}"
-        ddr = f"{s['mean_ddr']:.4f} ± {s['std_ddr']:.4f}"
-        fpr = f"{s['mean_fpr']:.4f} ± {s['std_fpr']:.4f}"
-        nr = f"{s['mean_noise_ratio']:.4f} ± {s['std_noise_ratio']:.4f}"
-        cost = f"${s['mean_cost_usd']:.4f}"
+        ddr = _fmt_metric(s["mean_ddr"], s["std_ddr"])
+        fpr = _fmt_metric(s["mean_fpr"], s["std_fpr"])
+        nr = _fmt_metric(s["mean_noise_ratio"], s["std_noise_ratio"])
+        cost = f"${s['mean_cost_usd']:.4f}" if s["mean_cost_usd"] is not None else "N/A"
         lines.append(f"| {lang} | {n_label} | {ddr} | {fpr} | {nr} | {cost} |")
 
     if not summaries:
@@ -242,14 +256,22 @@ def render_experiment_h(token_summary: list) -> str:
     for lang in ("python", "rust"):
         unc = by_key.get((lang, "unconstrained"), {})
         ref = by_key.get((lang, "refactory-profile"), {})
-        unc_cost = unc.get("mean_cost_usd", 0.0)
-        ref_cost = ref.get("mean_cost_usd", 0.0)
-        delta = ref_cost - unc_cost
-        pct = (delta / unc_cost * 100) if unc_cost > 0 else 0.0
-        delta_str = f"+${delta:.4f}" if delta >= 0 else f"-${abs(delta):.4f}"
-        pct_str = f"+{pct:.1f}%" if pct >= 0 else f"{pct:.1f}%"
+        unc_cost = unc.get("mean_cost_usd")
+        ref_cost = ref.get("mean_cost_usd")
+        if unc_cost is not None and ref_cost is not None:
+            delta = ref_cost - unc_cost
+            pct = (delta / unc_cost * 100) if unc_cost > 0 else 0.0
+            delta_str = f"+${delta:.4f}" if delta >= 0 else f"-${abs(delta):.4f}"
+            pct_str = f"+{pct:.1f}%" if pct >= 0 else f"{pct:.1f}%"
+            unc_str = f"${unc_cost:.4f}"
+            ref_str = f"${ref_cost:.4f}"
+        else:
+            delta_str = "N/A"
+            pct_str = "N/A"
+            unc_str = f"${unc_cost:.4f}" if unc_cost is not None else "N/A"
+            ref_str = f"${ref_cost:.4f}" if ref_cost is not None else "N/A"
         lines.append(
-            f"| {lang.capitalize()} | ${unc_cost:.4f} | ${ref_cost:.4f} | {delta_str} | {pct_str} |"
+            f"| {lang.capitalize()} | {unc_str} | {ref_str} | {delta_str} | {pct_str} |"
         )
 
     lines += [
@@ -275,10 +297,10 @@ def render_comparison_table(metrics_list: list, token_summary: list) -> str:
                     "language": lang.capitalize(),
                     "condition": cond,
                     "n_runs": f"{s['n_runs']}{missing_note}",
-                    "mean_ddr": f"{s['mean_ddr']:.4f}",
-                    "mean_fpr": f"{s['mean_fpr']:.4f}",
-                    "mean_noise_ratio": f"{s['mean_noise_ratio']:.4f}",
-                    "mean_cost": f"${s['mean_cost_usd']:.4f}",
+                    "mean_ddr": f"{s['mean_ddr']:.4f}" if s["mean_ddr"] is not None else "N/A",
+                    "mean_fpr": f"{s['mean_fpr']:.4f}" if s["mean_fpr"] is not None else "N/A",
+                    "mean_noise_ratio": f"{s['mean_noise_ratio']:.4f}" if s["mean_noise_ratio"] is not None else "N/A",
+                    "mean_cost": f"${s['mean_cost_usd']:.4f}" if s["mean_cost_usd"] is not None else "N/A",
                 }
             )
 
