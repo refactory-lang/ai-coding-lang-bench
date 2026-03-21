@@ -1,384 +1,293 @@
 # Tasks: Track 1 — Reviewability Gap (Experiments A, B, H)
 
 **Feature Branch**: `copilot/004-track-1-reviewability`  
+**Spec**: `specs/004-track-1-reviewability/spec.md`  
 **Plan**: `specs/004-track-1-reviewability/plan.md`  
 **Created**: 2026-03-20  
 **Status**: Ready for implementation
 
 ---
 
+## Quick Reference
+
+| Stat | Value |
+|------|-------|
+| Total tasks | 21 |
+| US1 tasks (P1) | 8 (T005–T012) |
+| US2 tasks (P2) | 2 (T013–T014) |
+| US3 tasks (P3) | 2 (T015–T016) |
+| Parallelisable tasks | 10 |
+| Test tasks | 5 (T008, T010, T012, T016, T018) |
+| Suggested MVP scope | Phase 3 complete (US1 end-to-end: inject → review → score) |
+
+---
+
 ## Dependency Order
 
 ```
-Phase A → Phase B → Phase C → Phase D (parallel)
-                               Phase E (parallel) → Phase F
+Phase 1 (Setup)
+  |-> Phase 2 (Foundation: bug catalog)
+        |-> Phase 3 (US1: injection + harness + scorer)
+              |-> Phase 4 (US2: refactory-profile condition)  --+
+              |-> Phase 5 (US3: token analysis)               --|
+              |                                                  v
+              +------------------------------> Phase 6 (Polish: reports + orchestration)
 ```
 
-All tasks within a phase are independent unless noted with "depends on".
+Within Phase 3 the internal execution order is:
 
----
-
-## Phase A: Bug Catalog & Injection
-
-### TASK-A1 — Write bug catalog JSON
-
-**File**: `bugs/catalog.json`  
-**Description**: Create the pre-defined bug catalog with 6 logic-error templates for Python and 6 for Rust (12 entries total). Each entry follows the `BugDefinition` schema in `data-model.md`.
-
-**Bug IDs (Python)**: `PY-OBO-LOG`, `PY-HASH-SEED`, `PY-STATUS-STAGE`, `PY-PARENT-NULL`, `PY-INDEX-FLUSH`, `PY-DIFF-BASE`  
-**Bug IDs (Rust)**: `RS-OBO-LOG`, `RS-HASH-SEED`, `RS-STATUS-STAGE`, `RS-PARENT-NULL`, `RS-INDEX-FLUSH`, `RS-DIFF-BASE`
-
-Each entry must include:
-- `id`, `category`, `language`, `description`
-- `affected_commands` (MiniGit commands impacted)
-- `test_impact` (which of the 30 v2 tests fail/pass after injection)
-- `injection_strategy` (precise, unambiguous transformation description)
-
-**Acceptance**: `python3 -c "import json; c=json.load(open('bugs/catalog.json')); assert len(c)==12"` passes.
-
----
-
-### TASK-A2 — Implement bug injection tool
-
-**File**: `bugs/inject.py`  
-**Description**: Implement the `bugs/inject.py` CLI tool per the contract in `contracts/cli-contracts.md`.
-
-**Requirements to satisfy**: FR-001, FR-002, FR-008, FR-009
-
-**Core logic**:
-1. Copy `--source-dir` to `--output-dir` (overwrite if exists).
-2. Load `bugs/catalog.json`, filter by `--language`.
-3. Select 3 bugs: use `--bugs` list if provided, otherwise use PRNG seeded with `--seed` (default: trial number) to select 3 non-repeating entries.
-4. For each selected bug, apply the `injection_strategy` transformation to the relevant file.
-5. Verify compilation: run `python3 -m py_compile *.py` (Python) or `cargo check` (Rust); abort and report error if it fails.
-6. Write `BugManifest` JSON to `--manifest-path`.
-
-**Acceptance**:
-- Running on `generated/minigit-python-{N}-v2` produces a manifest with exactly 3 entries and a seeded copy that compiles.
-- Running twice with same args produces identical manifest and seeded copy (idempotent).
-- Running with an unknown language exits with code 1 and a clear error message.
-
----
-
-### TASK-A3 — Write inject.py unit tests
-
-**File**: `bugs/test_inject.py`  
-**Depends on**: TASK-A1, TASK-A2  
-**Description**: Unit tests for the injection tool covering:
-
-1. **Happy path**: inject into a minimal valid Python file → manifest has 3 entries with correct metadata.
-2. **Idempotency**: running twice produces identical output.
-3. **Determinism**: same `--seed` always selects same 3 bugs.
-4. **Compilation check**: injecting a bug that produces invalid Python syntax causes the tool to error (guard for future catalog mistakes).
-5. **Co-location edge case**: if two selected bugs target the same line, both are recorded in the manifest at the same `line_number`.
-
-**Acceptance**: `python3 -m pytest bugs/test_inject.py -v` passes all tests.
-
----
-
-### TASK-A4 — Update bugs/README.md
-
-**File**: `bugs/README.md`  
-**Depends on**: TASK-A1, TASK-A2  
-**Description**: Replace the one-line placeholder with a document covering:
-- Purpose and scope (Track 1 Experiment A/B)
-- Catalog format (`BugDefinition` schema reference)
-- How to add a new bug template
-- `inject.py` usage examples
-- How bug selection is deterministic
-
----
-
-## Phase B: Review Harness
-
-### TASK-B1 — Write reviewer prompt templates
-
-**Files**: `review/prompts/unconstrained.txt`, `review/prompts/refactory-profile.txt`  
-**Description**: Create the two system prompt files per the design in `plan.md` (Phase 1 → Prompt Design section).
-
-**unconstrained.txt**: instructs Claude to review for logic errors only, output structured findings in the exact format `**Finding N**: <file_path>, lines <start>–<end>` followed by a one-sentence description.
-
-**refactory-profile.txt**: prepends the Rust-constraint preamble (flag shared-state mutation, unclosed resources, unchecked index access) then appends the unconstrained instructions.
-
-**Acceptance**: Both files exist, are valid UTF-8, and contain the `**Finding N**:` output format string.
-
----
-
-### TASK-B2 — Write pricing config
-
-**File**: `review/pricing.json`  
-**Description**: Create a JSON map of Anthropic model strings to per-1k-token prices (USD). Must include at minimum `claude-opus-4.6` and `claude-sonnet-4-5`. Values taken from published Anthropic pricing at experiment time.
-
-```json
-{
-  "claude-opus-4.6":   { "input_per_1k": 0.015, "output_per_1k": 0.075 },
-  "claude-sonnet-4-5": { "input_per_1k": 0.003, "output_per_1k": 0.015 }
-}
+```
+T005[P], T006[P], T007  (parallel start: all three independent)
+    T005+T006 -> T009
+    T007      -> T008[P]     (inject tests; does not block T011)
+    T007+T009 -> T011        (score.py; T008 does NOT need to complete first)
+    T009      -> T010[P]     (harness tests; parallel with T011)
+    T011      -> T012
 ```
 
-**Note**: Update these values to match current Anthropic pricing when the experiment is run. The model key must match exactly the string passed to `--model`.
+---
+
+## Phase 1: Setup
+
+> **Goal**: Create the on-disk scaffold and repository configuration required by all subsequent phases.
+
+- [ ] T001 Create experiments/track1/ directory scaffold with subdirectories: seeded/, manifests/, reviews/unconstrained/, reviews/refactory-profile/, metrics/, reports/
+- [ ] T002 [P] Add `experiments/track1/seeded/` to .gitignore (seeded source lives on the data branch; all other track1/ subdirs are committed)
 
 ---
 
-### TASK-B3 — Implement review harness
+## Phase 2: Foundation — Bug Catalog
 
-**File**: `review/harness.py`  
-**Depends on**: TASK-B1, TASK-B2  
-**Description**: Implement the `review/harness.py` CLI tool per the contract in `contracts/cli-contracts.md`.
+> **Goal**: Establish the pre-defined, deterministic bug catalog that all injection and scoring tasks depend on. Must be complete before any Phase 3 work begins.
 
-**Requirements to satisfy**: FR-003, FR-003a, FR-004, FR-008, FR-009
+- [ ] T003 Write bugs/catalog.json containing exactly 12 `BugDefinition` entries (6 Python + 6 Rust) using the schema in `specs/004-track-1-reviewability/data-model.md`
 
-**Core logic**:
-1. Read `--manifest-path` to extract `run_id`, `language`, `trial`.
-2. Load the prompt template for `--condition`.
-3. Collect all source files from `--seeded-dir` in alphabetical order; concatenate with `### {filename}` headers as the user prompt.
-4. Call `anthropic.Anthropic().messages.create(model=..., system=..., messages=[...], max_tokens=..., temperature=0)` — **no `tools` parameter**.
-5. Parse the response text into a list of `ReviewFinding` objects using the `**Finding N**:` format.
-6. Look up pricing from `review/pricing.json` for the model; compute `estimated_cost_usd`.
-7. Write `ReviewResponse` JSON to `--output-path`.
-8. Retry policy: catch `anthropic.APIStatusError` (status >= 500) and `anthropic.RateLimitError`; wait 2 s, 4 s, 8 s before retries 2, 3; on exhaustion write response with `missing_data: true` and exit code 2.
-9. Terminal errors (`AuthenticationError`, `InvalidRequestError`): write `missing_data: true` and exit code 1 immediately.
+  **Bug IDs — Python**: `PY-OBO-LOG`, `PY-HASH-SEED`, `PY-STATUS-STAGE`, `PY-PARENT-NULL`, `PY-INDEX-FLUSH`, `PY-DIFF-BASE`  
+  **Bug IDs — Rust**: `RS-OBO-LOG`, `RS-HASH-SEED`, `RS-STATUS-STAGE`, `RS-PARENT-NULL`, `RS-INDEX-FLUSH`, `RS-DIFF-BASE`
 
-**Acceptance**:
-- With a valid API key, running on a seeded Python implementation produces a ReviewResponse JSON with `missing_data: false` and at least one field in `findings` (empty list is valid).
-- Running with `--condition refactory-profile` on the same input produces an identically-structured JSON.
-- Running with an invalid API key exits with code 1 and writes a `missing_data: true` response.
+  Each entry must include `id`, `category`, `language`, `description`, `affected_commands`, `test_impact`, and `injection_strategy`. All bugs must be logic errors that survive `python3 -m py_compile` (Python) or `cargo check` (Rust) and do not trip all 30 v2 test cases (FR-002). Categories: `off-by-one`, `wrong-hash-seed`, `wrong-status`, `missing-parent`, `index-not-flushed`, `wrong-diff-base`.
+
+  *Validation*: `python3 -c "import json; c=json.load(open('bugs/catalog.json')); assert len(c)==12; assert sum(1 for e in c if e['language']=='python')==6"` passes.
+
+- [ ] T004 [P] Update bugs/README.md with: catalog purpose and scope (Track 1 Exp A/B), `BugDefinition` schema reference, how to add a new bug template, `inject.py` usage examples, and explanation of deterministic bug selection via PRNG seed
 
 ---
 
-### TASK-B4 — Write harness integration test
+## Phase 3: User Story 1 — Bug Injection & Single-Pass Unconstrained Review (P1)
 
-**File**: `review/test_harness.py`  
-**Depends on**: TASK-B3  
-**Description**: Integration tests using a mocked Anthropic client:
+> **Story goal**: Inject exactly 3 seeded logic bugs into each of the 39 target MiniGit implementations (20 Python + 19 Rust), submit each seeded copy to a single-pass non-agentic Anthropic Claude review (unconstrained condition), and score each review to produce per-run DDR and FPR.
+>
+> **Independent test**: Inject one known bug into a single Python implementation, run the unconstrained reviewer, confirm the ReviewResponse JSON contains a `findings` list, and confirm `score.py` produces `ddr` in [0, 1].
 
-1. **Happy path**: mock returns a response with 2 findings → JSON written with `missing_data: false`, `findings` has 2 entries, `input_tokens` matches mock usage.
-2. **Rate limit retry**: mock raises `RateLimitError` twice then succeeds → `retry_count: 2`, `missing_data: false`.
-3. **Exhausted retries**: mock raises `APIStatusError` 3× → `missing_data: true`, exit code 2.
-4. **Auth error**: mock raises `AuthenticationError` → `missing_data: true`, exit code 1, no retry.
-5. **Refactory-profile condition**: running with `refactory-profile` loads the correct prompt file.
+- [ ] T005 [P] [US1] Create review/prompts/unconstrained.txt containing the reviewer system prompt: expert logic-error-only review, structured output format `**Finding N**: <file_path>, lines <start>–<end>` followed by one-sentence description; no fix suggestions; no style comments
 
-**Acceptance**: `python3 -m pytest review/test_harness.py -v` passes all tests.
+- [ ] T006 [P] [US1] Create review/pricing.json mapping Anthropic model strings to per-1k-token USD prices; must include at minimum `claude-opus-4.6` (`input_per_1k: 0.015`, `output_per_1k: 0.075`) and `claude-sonnet-4-5` (`input_per_1k: 0.003`, `output_per_1k: 0.015`); update to current Anthropic pricing before running the experiment
 
----
+- [ ] T007 [US1] Implement bugs/inject.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: copy source to output dir, load catalog, select 3 bugs via `--bugs` list or PRNG seed, apply `injection_strategy` transformations, verify compilation, write `BugManifest` JSON to `--manifest-path` (FR-001, FR-002, FR-008, FR-009)
 
-## Phase C: Scoring Engine
+  *Flags*: `--source-dir`, `--output-dir`, `--manifest-path`, `--language`, `--trial`, `[--bugs BUG_ID,BUG_ID,BUG_ID]`, `[--seed INT]`  
+  *Constraints*: idempotent (re-run overwrites); exits 1 if fewer than 3 catalog entries match the language; manifest `bugs` array always has exactly 3 `BugInjection` elements with `bug_id`, `category`, `file_path`, `line_number`, `original_line`, `injected_line`
 
-### TASK-C1 — Implement scoring tool
+- [ ] T008 [US1] Write bugs/test_inject.py covering: (1) happy-path injection into minimal valid Python file produces manifest with 3 entries; (2) idempotency — running twice produces identical output; (3) determinism — same `--seed` always selects same 3 bugs; (4) compilation guard — catalog entry producing invalid syntax causes tool to error; (5) co-location edge case — two bugs targeting same line both recorded at correct `line_number`
 
-**File**: `review/score.py`  
-**Depends on**: TASK-A2, TASK-B3  
-**Description**: Implement `review/score.py` per the contract in `contracts/cli-contracts.md`.
+  *Runner*: `python3 -m pytest bugs/test_inject.py -v`
 
-**Requirements to satisfy**: FR-005, FR-008
+- [ ] T009 [US1] Implement review/harness.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: read manifest for metadata, load condition prompt, concatenate source files alphabetically with `### filename` headers, call `anthropic.Anthropic().messages.create(temperature=0, no tools)`, parse `**Finding N**:` findings, look up pricing, write `ReviewResponse` JSON; retry policy: catch `APIStatusError` (5xx) and `RateLimitError`, backoff 2 s/4 s/8 s, on exhaustion write `missing_data: true` exit 2; terminal errors (`AuthenticationError`, `InvalidRequestError`) write `missing_data: true` exit 1 immediately (FR-003, FR-003a, FR-004, FR-008, FR-009)
 
-**Core logic**:
-1. Load `BugManifest` and `ReviewResponse` from JSON files.
-2. For each injected bug `B`, scan all findings: a finding is a TP for `B` if `finding.file_path == B.file_path AND |finding.line_start - B.line_number| <= line_tolerance`.
-3. Co-location rule: if multiple bugs share the same `(file_path, line_number)`, a finding that matches the location is a TP for **every** such bug.
-4. Any finding not classified as TP for any bug is a FP.
-5. Compute `tp_count`, `fp_count`, `fn_count = total_bugs - tp_count`, `ddr`, `fpr`.
-6. Copy token counts and cost from `ReviewResponse`.
-7. Write `RunMetrics` JSON to `--output-path`.
-8. If `ReviewResponse.missing_data == true`: write metrics with `missing_data: true`, `ddr: null`, `fpr: null`.
+  *Flags*: `--seeded-dir`, `--manifest-path`, `--output-path`, `--condition`, `[--model claude-opus-4.6]`, `[--max-tokens 4096]`, `[--api-key-env ANTHROPIC_API_KEY]`  
+  *Output schema*: `ReviewResponse` per `data-model.md` — includes `run_id`, `condition`, `model`, `reviewed_at`, `input_tokens`, `output_tokens`, `finish_reason`, `price_per_1k_input_usd`, `price_per_1k_output_usd`, `estimated_cost_usd`, `raw_text`, `findings[]`, `missing_data`, `missing_data_reason`, `retry_count`
 
-**Acceptance**:
-- Re-running on unchanged artifacts produces identical output.
-- `ddr` is always in [0, 1] (or null for missing data).
-- Zero findings → `ddr: 0.0`, `fpr: 0.0`.
+- [ ] T010 [US1] Write review/test_harness.py integration tests using a mocked `anthropic.Anthropic` client covering: (1) happy path — mock returns 2 findings → JSON written with `missing_data: false`, correct token counts; (2) rate-limit retry — mock raises `RateLimitError` twice then succeeds → `retry_count: 2`, `missing_data: false`; (3) exhausted retries — mock raises `APIStatusError` (5xx) 3× → `missing_data: true`, exit code 2; (4) auth error — mock raises `AuthenticationError` → `missing_data: true`, exit code 1, no retry attempted; (5) empty findings — mock returns review text with zero `**Finding N**:` blocks → `findings: []`, `missing_data: false`
+
+  *Runner*: `python3 -m pytest review/test_harness.py -v`  
+  *Note*: no real API calls; mock via `unittest.mock.patch`
+
+- [ ] T011 [US1] Implement review/score.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: load `BugManifest` and `ReviewResponse`, apply location-based matching (`finding.file_path == bug.file_path AND |finding.line_start - bug.line_number| <= line_tolerance`, default 5), apply co-location rule (finding matching a shared window is TP for all bugs at that location), classify remaining findings as FP, compute `tp_count`, `fp_count`, `fn_count = total_bugs - tp_count`, `ddr = tp_count / total_bugs`, `fpr = fp_count / (fp_count + fn_count)` (0 when denominator is 0), copy token fields from `ReviewResponse`, write `RunMetrics` JSON; if `ReviewResponse.missing_data == true` write metrics with `missing_data: true`, `ddr: null`, `fpr: null` (FR-005, FR-008)
+
+  *Flags*: `--manifest-path`, `--review-path`, `--output-path`, `[--line-tolerance 5]`  
+  *Exit code*: always 0 (missing data is a valid outcome, not an error)  
+  *Output path convention*: `experiments/track1/metrics/{lang}-{trial}-v2-{condition}.json`
+
+- [ ] T012 [US1] Write review/test_score.py unit tests covering: (1) all 3 bugs detected — 3 matching findings → `ddr=1.0`, `fp_count=0`; (2) no findings — `ddr=0.0`, `fpr=0.0`; (3) partial detection — 1 of 3 bugs found, 2 FPs → `ddr≈0.333`, `fp_count=2`; (4) co-located bugs — 2 bugs at line 87; 1 finding at line 87 → both TPs, `tp_count=2`; (5) line tolerance pass — bug at line 87; finding at line 90; tolerance=5 → TP; (6) line tolerance exceeded — bug at line 87; finding at line 93; tolerance=5 → FP; (7) null `line_start` in finding — classified as FP; (8) missing data propagation — `ReviewResponse.missing_data=true` → `RunMetrics.ddr=null`, `RunMetrics.fpr=null`
+
+  *Runner*: `python3 -m pytest review/test_score.py -v`
 
 ---
 
-### TASK-C2 — Write score.py unit tests
+## Phase 4: User Story 2 — Constrained Python Review / Experiment B (P2)
 
-**File**: `review/test_score.py`  
-**Depends on**: TASK-C1  
-**Description**: Unit tests for the scoring algorithm:
+> **Story goal**: Run the same seeded Python implementations through the review harness under the Refactory-profile ("Python-as-Rust") constraint and confirm the output is structurally identical to Experiment A, enabling direct DDR/FPR comparison.
+>
+> **Independent test**: Run the harness on one seeded Python implementation with `--condition refactory-profile` and confirm the ReviewResponse JSON schema matches Experiment A output exactly.
 
-1. **All bugs detected**: 3 findings matching all 3 bugs → `ddr=1.0`, `fp_count=0`.
-2. **No bugs detected**: 0 findings → `ddr=0.0`, `fp_count=0`.
-3. **Partial detection**: 1 of 3 bugs found, 2 FPs → `ddr=0.333`, `fp_count=2`.
-4. **Co-located bugs**: 2 bugs at line 87; 1 finding at line 87 → both are TPs, `tp_count=2`.
-5. **Line tolerance**: bug at line 87; finding at line 90; tolerance=5 → TP.
-6. **Line tolerance exceeded**: bug at line 87; finding at line 93; tolerance=5 → FP.
-7. **Null line_start in finding**: finding has no line number → FP (cannot match any bug).
-8. **Missing data propagation**: `ReviewResponse.missing_data=true` → `RunMetrics.ddr=null`.
+- [ ] T013 [P] [US2] Create review/prompts/refactory-profile.txt containing: Rust-constraint preamble (flag shared-state mutation without explicit tracking; flag file/resource handles not closed in finally/context-manager; flag index/key access without bounds check) prepended to the full unconstrained prompt from review/prompts/unconstrained.txt; output format must be identical to unconstrained (same `**Finding N**:` structure)
 
-**Acceptance**: `python3 -m pytest review/test_score.py -v` passes all tests.
+- [ ] T014 [US2] Add Experiment B condition test to review/test_harness.py: verify that invoking harness with `--condition refactory-profile` loads `review/prompts/refactory-profile.txt` (not unconstrained.txt), and that the resulting `ReviewResponse` JSON has identical field structure to an unconstrained response (enabling same scoring logic); confirm `condition` field is `"refactory-profile"` in output
+
+  *Note*: Extend the existing test module from T010; no new file needed
 
 ---
 
-## Phase D: Token Analysis (Experiment H)
+## Phase 5: User Story 3 — Review Token Economics / Experiment H (P3)
 
-*Can be developed in parallel with Phase E once Phase C is complete.*
+> **Story goal**: Process all saved `ReviewResponse` files from Experiments A and B, extract token counts, compute per-run costs, aggregate by language × condition, and produce a cost-evidence report with zero missing runs in the summary.
+>
+> **Independent test**: Process the saved token logs from a single Experiment A review run and verify the summary output (total input tokens, output tokens, estimated cost) is computed correctly.
 
-### TASK-D1 — Implement token analysis tool
+- [ ] T015 [P] [US3] Implement analysis/token_analysis.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: recursively scan `--reviews-dir` for `*.json` files (both `unconstrained/` and `refactory-profile/` subdirs), parse as `ReviewResponse`, extract `run_id`, `condition`, `language`, `trial`, `input_tokens`, `output_tokens`, `estimated_cost_usd`, `missing_data`, write per-run CSV to `--output-csv` and per-group summary JSON to `--output-summary`; aggregate groups by `(language, condition)` computing `n_runs`, `n_missing`, `mean`/`std` for token and cost fields, and sums (FR-006)
 
-**File**: `analysis/token_analysis.py`  
-**Depends on**: TASK-B3 (ReviewResponse schema)  
-**Description**: Implement `analysis/token_analysis.py` per the contract in `contracts/cli-contracts.md`.
+  *Flags*: `--reviews-dir`, `--output-csv`, `--output-summary`  
+  *Expected output*: per-run CSV (one row per `ReviewResponse` file found) and per-group summary JSON. Per spec, Experiment A covers all 39 implementations (Python + Rust, unconstrained), and Experiment B covers only the 20 Python implementations (refactory-profile) — so the full CSV has 59 rows (20 + 19 + 20) and the summary has 3 populated groups: `python/unconstrained`, `python/refactory-profile`, `rust/unconstrained`. The `rust/refactory-profile` group may appear with `n_runs: 0` or be omitted; either is acceptable provided the tool handles an empty directory without error. *(Note: plan.md mentions 78 calls = 39 × 2 conditions, which would include Rust under Exp B; if the experiment scope is extended to Rust, this row count increases to 78 and all 4 groups are populated. The tool must handle both sizes without code changes.)*  
+  *Stdlib only*: no external dependencies beyond `csv`, `json`, `statistics`, `pathlib`
 
-**Requirements to satisfy**: FR-006
+- [ ] T016 [P] [US3] Write analysis/test_token_analysis.py covering: (1) happy path — 3 mock `ReviewResponse` files → CSV has 3 rows, summary means are correct; (2) missing data excluded from means — 1 missing + 2 valid → means over 2 only, `n_missing: 1`; (3) group aggregation — 2 languages × 2 conditions → 4 summary entries; (4) empty input — no JSON files → empty CSV header row, empty summary array
 
-**Core logic**:
-1. Recursively scan `--reviews-dir` for all `*.json` files; parse each as `ReviewResponse`.
-2. Extract `run_id`, `condition`, `language`, `trial`, `input_tokens`, `output_tokens`, `estimated_cost_usd`, `missing_data`.
-3. Write per-run CSV to `--output-csv`.
-4. Aggregate by `(language, condition)`: compute `n_runs`, `n_missing`, `mean`/`std` for `input_tokens`, `output_tokens`, `estimated_cost_usd`; sum totals.
-5. Write per-group summary JSON array to `--output-summary`.
-
-**Acceptance**:
-- Running on the full `experiments/track1/reviews/` directory produces a CSV with exactly `n_runs` rows (39 × 2 conditions = 78 rows).
-- Summary JSON has 4 entries: `python/unconstrained`, `python/refactory-profile`, `rust/unconstrained`, `rust/refactory-profile`.
-- `n_missing + n_valid = n_runs` for each group.
+  *Runner*: `python3 -m pytest analysis/test_token_analysis.py -v`
 
 ---
 
-### TASK-D2 — Write token analysis unit tests
+## Phase 6: Polish & Cross-Cutting Concerns
 
-**File**: `analysis/test_token_analysis.py`  
-**Depends on**: TASK-D1  
-**Description**:
+> **Goal**: Reporting, end-to-end orchestration, and documentation sufficient for a new contributor to reproduce results without reading source code (SC-006).
 
-1. **Happy path**: 3 mock ReviewResponse files → CSV has 3 rows, summary has correct means.
-2. **Missing data excluded from means**: 1 missing + 2 valid → means computed over 2 only, `n_missing: 1`.
-3. **Group aggregation**: reviews from 2 languages × 2 conditions → 4 summary rows.
-4. **Empty input**: no JSON files → empty CSV, empty summary array.
+- [ ] T017 [P] Implement review/report.py CLI per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: aggregate `RunMetrics` files into `ExperimentSummary` tables and render four Markdown reports under `--output-dir` — `experiment-a.md` (DDR/FPR for unconstrained, both languages), `experiment-b.md` (DDR/FPR for refactory-profile, Python only), `experiment-h.md` (token cost analysis: per-group mean input tokens, output tokens, mean cost, total cost, absolute and % difference between conditions), `comparison-table.md` (side-by-side DDR, FPR, mean cost for all conditions — must show ≥ 2 languages and ≥ 2 conditions per SC-005); missing-data runs noted with "(N missing)" in each table; re-running on unchanged inputs produces identical output (FR-007)
 
-**Acceptance**: `python3 -m pytest analysis/test_token_analysis.py -v` passes.
+  *Flags*: `--metrics-dir`, `--token-summary`, `--output-dir`
 
----
+- [ ] T018 [P] Write review/test_report.py covering: (1) experiment-a.md renders correctly — 2 RunMetrics inputs (python, rust) → table has 2 language rows with correct DDR values; (2) missing data noted in report — 1 missing run → "(1 missing)" appears in the relevant table; (3) experiment-h.md cost comparison — unconstrained $0.08/run, refactory $0.09/run → delta column shows +$0.01 (+12.5%); (4) comparison-table.md columns — `Language`, `Condition`, `DDR`, `FPR`, `Mean Cost (USD)` all present
 
-## Phase E: Report Generator
+  *Runner*: `python3 -m pytest review/test_report.py -v`
 
-*Can be developed in parallel with Phase D once Phase C is complete.*
+- [ ] T019 Implement run-track1.sh end-to-end orchestrator per `specs/004-track-1-reviewability/contracts/cli-contracts.md`: read `results/results.json` to build target list (Python + Rust runs where both `v1_pass` and `v2_pass` are true); for each run call `bugs/inject.py` (skip if manifest at `experiments/track1/manifests/{run_id}.json` already exists); for each run × condition call `review/harness.py` (skip if response at `experiments/track1/reviews/{condition}/{run_id}.json` already exists); for each run × condition call `review/score.py` (always re-score — deterministic); call `analysis/token_analysis.py`; call `review/report.py`; print summary: `N runs seeded, N reviews completed (N missing), reports written to experiments/track1/reports/`; `--dry-run` flag prints all commands without executing API calls; exit codes: 0 success, 1 argument error, 2 inject failure (FR-008)
 
-### TASK-E1 — Implement report generator
+  *Flags*: `[--data-branch data]`, `[--condition both|unconstrained|refactory-profile]`, `[--model claude-opus-4.6]`, `[--dry-run]`  
+  *Skip logic*: critical for resumability — prevents re-incurring API costs after partial failure (FR-009, SC-002)
 
-**File**: `review/report.py`  
-**Depends on**: TASK-C1, TASK-D1  
-**Description**: Implement `review/report.py` per the contract in `contracts/cli-contracts.md`.
+- [ ] T020 Write specs/004-track-1-reviewability/quickstart.md step-by-step reproduction guide covering: (1) prerequisites (Python 3.9+, `pip install anthropic`, `ANTHROPIC_API_KEY` env var, access to `data` branch); (2) checking out the `data` branch and verifying the 39-implementation source pool; (3) dry-run verification: `bash run-track1.sh --dry-run`; (4) running Experiment A: `bash run-track1.sh --condition unconstrained`; (5) running Experiment B: `bash run-track1.sh --condition refactory-profile`; (6) running Experiment H token analysis standalone; (7) where to find reports under `experiments/track1/reports/`; (8) how to re-score without re-calling the API (delete only metrics/ files; leave reviews/ intact)
 
-**Requirements to satisfy**: FR-007
+  *Acceptance*: a reviewer unfamiliar with the codebase can execute the pipeline following this guide without consulting source code (SC-006)
 
-**Outputs**:
-
-- **`experiment-a.md`**: Table of DDR and FPR per language for `unconstrained` condition; one row per language, showing mean ± std; n_runs; n_missing.
-- **`experiment-b.md`**: Same table for `refactory-profile` condition (Python only, since Exp B targets Python).
-- **`experiment-h.md`**: Token cost table — per language × condition: mean input tokens, mean output tokens, mean cost USD, total cost USD. Includes absolute and % differences between unconstrained and refactory-profile.
-- **`comparison-table.md`**: Side-by-side DDR, FPR, and mean cost for all conditions (SC-005).
-
-**Acceptance**:
-- `comparison-table.md` contains at least 2 language rows and 2 condition columns.
-- All four files are valid Markdown (no syntax errors).
-- Re-running generates identical output from identical input.
+- [ ] T021 Update EXPERIMENTS.md with a "Running Track 1" section under the Track 1 heading: include the single `run-track1.sh` command for end-to-end execution, link to `specs/004-track-1-reviewability/quickstart.md`, note expected runtime (~5 min for injection + scoring, ~15–20 min for 78 API calls) and estimated API cost (~$1.10 at claude-opus-4.6 2026-03 pricing)
 
 ---
 
-### TASK-E2 — Write report generator unit tests
+## Dependency Graph
 
-**File**: `review/test_report.py`  
-**Depends on**: TASK-E1  
-**Description**:
-
-1. **experiment-a.md renders correctly**: 2 RunMetrics files (python, rust) → table has 2 rows with correct DDR values.
-2. **Missing data in report**: 1 missing run → noted in report with "(N missing)" count.
-3. **experiment-h.md cost comparison**: unconstrained costs $0.08/run, refactory $0.09/run → Δ shows +$0.01 (+12.5%).
-4. **comparison-table.md columns**: at least `Language`, `Condition`, `DDR`, `FPR`, `Mean Cost` columns present.
-
-**Acceptance**: `python3 -m pytest review/test_report.py -v` passes.
-
----
-
-## Phase F: Orchestration & Documentation
-
-### TASK-F1 — Implement end-to-end orchestrator
-
-**File**: `run-track1.sh`  
-**Depends on**: All Phase A–E tasks  
-**Description**: Implement the orchestrator per the contract in `contracts/cli-contracts.md`.
-
-**Core logic**:
-1. Parse `--data-branch`, `--condition`, `--model`, `--dry-run` flags.
-2. Read `results/results.json` to build the list of target runs (Python + Rust, `v1_pass=true` AND `v2_pass=true`).
-3. For each run: call `bugs/inject.py` (skip if manifest exists at `experiments/track1/manifests/{run_id}.json`).
-4. For each run × condition: call `review/harness.py` (skip if review exists at `experiments/track1/reviews/{condition}/{run_id}.json`).
-5. For each run × condition: call `review/score.py` (always re-score; deterministic).
-6. Call `analysis/token_analysis.py`.
-7. Call `review/report.py`.
-8. Print a summary: `N runs seeded, N reviews completed (N missing), reports written to experiments/track1/reports/`.
-
-**Skip logic**: avoids re-incurring API costs when resuming after partial failure (FR-009 and SC-002).
-
-**Acceptance**:
-- `bash run-track1.sh --dry-run` prints all commands without executing API calls.
-- `bash run-track1.sh --condition unconstrained` processes only Experiment A.
-- Script exits 0 when all runs succeed; exits 2 if any inject step fails; exits 0 with a warning if some review runs are missing data.
-
----
-
-### TASK-F2 — Write quickstart guide
-
-**File**: `specs/004-track-1-reviewability/quickstart.md`  
-**Depends on**: TASK-F1  
-**Description**: Step-by-step reproduction guide covering:
-
-1. Prerequisites (Python 3.9+, `anthropic` Python package, `ANTHROPIC_API_KEY`, access to `data` branch).
-2. How to check out the `data` branch and verify the source pool.
-3. Running the dry-run to confirm setup.
-4. Running Experiment A: `bash run-track1.sh --condition unconstrained`.
-5. Running Experiment B: `bash run-track1.sh --condition refactory-profile`.
-6. Running Experiment H token analysis: `python3 analysis/token_analysis.py ...`.
-7. Where to find the reports.
-8. How to re-score without re-calling the API.
-
-**Acceptance**: A reviewer unfamiliar with the codebase can follow the guide without consulting source code. No undocumented steps.
-
----
-
-### TASK-F3 — Update EXPERIMENTS.md with Track 1 pipeline command
-
-**File**: `EXPERIMENTS.md`  
-**Depends on**: TASK-F1, TASK-F2  
-**Description**: Add a "Running Track 1" section to `EXPERIMENTS.md` under the Track 1 heading. Include:
-- The single `run-track1.sh` command for end-to-end execution
-- A link to `specs/004-track-1-reviewability/quickstart.md` for full instructions
-- A brief note on expected runtime and API cost
-
----
-
-### TASK-F4 — Add .gitignore entries
-
-**File**: `.gitignore`  
-**Description**: Add entries to ensure experiment outputs are not accidentally committed to the feature branch:
 ```
-# Track 1 experiment outputs (data branch or gitignored)
-experiments/track1/seeded/
+T001 --+
+T002 --+  (parallel)
+       |
+       v
+T003 --+
+T004 --+  (parallel; T004 soft-depends on T003 for content)
+       |
+       v
+T005[P] --+
+T006[P] --+  (parallel start; all independent)
+T007    --+
+       |
+       +-- T008[P]  (after T007; inject tests)
+       +-- T009     (after T005+T006; harness impl)
+              |
+              +-- T010[P]  (after T009; harness tests)
+              +-- T011     (after T007+T009; scorer — T008 not required)
+                     |
+                     +-- T012
+                            |
+              +-------------+
+              |             |
+              v             v
+           T013[P]      T015[P]
+           T014         T016[P]
+              |             |
+              +------+------+
+                     |
+                     v
+                  T017[P]
+                  T018[P]
+                     |
+                     v
+                   T019
+                   T020
+                   T021
 ```
-Note: `manifests/`, `reviews/`, `metrics/`, and `reports/` are small JSON/Markdown files intended to be committed as experimental outputs.
+
+**Phase cross-dependencies**:
+- T013 (refactory-profile prompt) has no code dependencies and can be authored in parallel with Phase 3 work, but logically belongs to US2.
+- T015 (token_analysis.py) only needs the `ReviewResponse` JSON schema (defined by T009); it can be developed in parallel with Phase 4 once T009 is complete.
+
+---
+
+## Parallel Execution Examples
+
+### US1 (Phase 3) — Three-stream start
+```
+Stream A: T005 -> T009 -> T010
+Stream B: T006 -> T009 (join with A)
+Stream C: T007 -> T008
+          T007 -> T011 (after T009 also ready)
+                T011 -> T012
+```
+T008 (inject tests) and T011 (score.py) can both start once their respective direct
+dependencies are met. T011 requires T007 + T009; it does NOT need T008 to complete
+first. T010 requires only T009.
+
+### US2 + US3 (Phases 4–5) — Post-US1 parallel
+```
+Stream A: T013 → T014
+Stream B: T015 → T016
+(join) → T017, T018
+```
+
+### Phase 6 (Polish)
+```
+T017[P] and T018[P] in parallel
+(join) → T019 → T020 → T021
+```
+
+---
+
+## Implementation Strategy
+
+**MVP scope (Phase 3 only)**: Complete T001–T012 for a fully working inject → review → score pipeline. This satisfies US1, allows spot-checking the reviewer output on real implementations, and de-risks the API integration before committing to all 78 calls.
+
+**Incremental delivery**:
+1. T001–T004: Bootstrap (no API required; no Python tooling needed; fast)
+2. T005–T007: Create inert artefacts and injection tool (no API required; testable with `--dry-run`)
+3. T008–T010: Tests catch regressions before integration
+4. T011–T012: Scorer completes the loop; US1 independently testable
+5. T013–T014: US2 requires only one new file + one test extension
+6. T015–T016: US3 is purely analytical; can be developed before Exp A/B data exists
+7. T017–T021: Reports and orchestration are the final integration layer
+
+**Cost gating**: Run `bash run-track1.sh --dry-run` after T019 to validate the full command sequence before committing to the ~$1.10 API spend.
 
 ---
 
 ## Test Execution Summary
 
-| Test File | Tool Under Test | Runner |
-|-----------|----------------|--------|
-| `bugs/test_inject.py` | `bugs/inject.py` | `python3 -m pytest bugs/test_inject.py` |
-| `review/test_harness.py` | `review/harness.py` | `python3 -m pytest review/test_harness.py` |
-| `review/test_score.py` | `review/score.py` | `python3 -m pytest review/test_score.py` |
-| `analysis/test_token_analysis.py` | `analysis/token_analysis.py` | `python3 -m pytest analysis/test_token_analysis.py` |
-| `review/test_report.py` | `review/report.py` | `python3 -m pytest review/test_report.py` |
+| File | Tool Under Test | Runner | Phase |
+|------|----------------|--------|-------|
+| `bugs/test_inject.py` | `bugs/inject.py` | `python3 -m pytest bugs/test_inject.py -v` | Phase 3 |
+| `review/test_harness.py` | `review/harness.py` | `python3 -m pytest review/test_harness.py -v` | Phase 3–4 |
+| `review/test_score.py` | `review/score.py` | `python3 -m pytest review/test_score.py -v` | Phase 3 |
+| `analysis/test_token_analysis.py` | `analysis/token_analysis.py` | `python3 -m pytest analysis/test_token_analysis.py -v` | Phase 5 |
+| `review/test_report.py` | `review/report.py` | `python3 -m pytest review/test_report.py -v` | Phase 6 |
 
-All tests use stdlib + pytest only (no API calls; Anthropic client mocked via `unittest.mock`).
+All tests use `stdlib` + `pytest` only. No real API calls — Anthropic client mocked via `unittest.mock.patch`.
+
+Full suite: `python3 -m pytest bugs/ review/ analysis/ -v`
 
 ---
 
 ## Completion Criteria
 
 All tasks complete when:
-- [ ] `python3 -m pytest bugs/ review/ analysis/ -v` passes (all unit + integration tests)
-- [ ] `bash run-track1.sh --dry-run` exits 0 and prints all expected command lines
-- [ ] `bugs/catalog.json` has 12 entries (6 Python + 6 Rust)
-- [ ] `specs/004-track-1-reviewability/quickstart.md` exists and is reviewed by one other contributor
-- [ ] All five tool scripts accept `--help` and exit 0
-- [ ] Spec acceptance criteria SC-001 through SC-006 are verifiable from the artifacts
+
+- [ ] `python3 -m pytest bugs/ review/ analysis/ -v` passes (all unit + integration tests, zero skipped)
+- [ ] `bash run-track1.sh --dry-run` exits 0 and prints all 39 inject + 78 review + 78 score + 1 analyse + 1 report command lines
+- [ ] `bugs/catalog.json` has exactly 12 entries — `python3 -c "import json; c=json.load(open('bugs/catalog.json')); assert len(c)==12"` passes
+- [ ] All five Python tool scripts accept `--help` and exit 0: `bugs/inject.py`, `review/harness.py`, `review/score.py`, `analysis/token_analysis.py`, `review/report.py`
+- [ ] `specs/004-track-1-reviewability/quickstart.md` exists and has been reviewed by at least one other contributor
+- [ ] Spec success criteria SC-001 through SC-006 are each verifiable from the produced artifacts
+- [ ] `experiments/track1/reports/comparison-table.md` shows ≥ 2 languages × ≥ 2 conditions with DDR, FPR, and mean cost columns (SC-005)
