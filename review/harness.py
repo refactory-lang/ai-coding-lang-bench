@@ -35,6 +35,14 @@ MAX_RETRIES = 3
 BACKOFF_SECONDS = [2, 4, 8]
 
 
+def _save_result_and_exit(result: dict, output_path: Path, exit_code: int = 1) -> None:
+    """Write result JSON to disk and terminate the process."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as fh:
+        json.dump(result, fh, indent=2)
+    sys.exit(exit_code)
+
+
 def load_prompt(condition: str) -> str:
     """Load the system prompt for the given condition."""
     prompt_file = PROMPTS_DIR / f"{condition}.txt"
@@ -288,10 +296,7 @@ def main():
         result["missing_data"] = True
         result["missing_data_reason"] = f"Client creation failed: {exc}"
         result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as fh:
-            json.dump(result, fh, indent=2)
-        sys.exit(1)
+        _save_result_and_exit(result, output_path)
 
     # Execute API call with retry policy
     last_error = None
@@ -325,10 +330,7 @@ def main():
                 result["missing_data_reason"] = f"{exc_type}: {exc}"
                 result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
                 result["retry_count"] = attempt
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(output_path, "w", encoding="utf-8") as fh:
-                    json.dump(result, fh, indent=2)
-                sys.exit(1)
+                _save_result_and_exit(result, output_path)
 
             # Retryable error
             if attempt < MAX_RETRIES:
@@ -345,14 +347,11 @@ def main():
                 result["missing_data_reason"] = f"All {MAX_RETRIES} retries exhausted. Last error: {exc}"
                 result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
                 result["retry_count"] = attempt
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(output_path, "w", encoding="utf-8") as fh:
-                    json.dump(result, fh, indent=2)
                 print(
                     f"Review {run_id} [{args.condition}]: MISSING DATA after {MAX_RETRIES} retries",
                     file=sys.stderr,
                 )
-                sys.exit(2)
+                _save_result_and_exit(result, output_path, exit_code=2)
 
     # Success path — write output
     output_path.parent.mkdir(parents=True, exist_ok=True)

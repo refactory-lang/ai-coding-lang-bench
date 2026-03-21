@@ -71,219 +71,6 @@ def select_bugs(catalog: list, seed: int, explicit_ids: list = None) -> list:
     return rng.sample(catalog, REQUIRED_BUG_COUNT)
 
 
-def find_injection_site(source_text: str, bug: dict) -> tuple:
-    """
-    Find the best injection site in source_text for the given bug.
-
-    Uses heuristics based on the bug category and affected commands to
-    locate a plausible injection point. Returns (line_number, original_line,
-    injected_line) or raises ValueError if no site is found.
-
-    Line numbers are 1-indexed.
-    """
-    lines = source_text.splitlines(keepends=True)
-    category = bug["category"]
-    language = bug["language"]
-
-    # Patterns to find injection sites by category
-    if category == "off-by-one":
-        # Find parent-chain traversal loop
-        patterns = [
-            r"^\s*while\s+parent\b",
-            r"^\s*while\s+current\b",
-            r"^\s*while\s+commit\b",
-            r"^\s*while\s+let\s+Some",
-            r"^\s*loop\s*\{",
-        ]
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            for pat in patterns:
-                if re.match(pat, stripped):
-                    orig = stripped
-                    if language == "python":
-                        indent = len(stripped) - len(stripped.lstrip())
-                        indent_str = " " * indent
-                        # Insert depth counter by modifying the condition
-                        injected = stripped.rstrip() + " and _depth < 999999:"
-                        # We need to track depth — but we only mutate one line
-                        # The "injected_line" represents the while condition change
-                        injected = re.sub(
-                            r"while\s+(parent|current|commit)\s*:",
-                            r"while \1 and _depth < 999999:",
-                            stripped,
-                        )
-                    else:
-                        # Rust: add a depth guard into the loop body by changing
-                        # the while condition
-                        injected = re.sub(
-                            r"while\s+let\s+Some\((\w+)\)",
-                            r"while let Some(\1)",
-                            stripped,
-                        )
-                        # For Rust we'll target the loop and add a break
-                        injected = stripped  # fallback — use strategy below
-                    if injected != stripped:
-                        return (i + 1, orig, injected)
-
-        # Fallback: find any loop related to commit traversal
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            if "parent" in stripped and ("while" in stripped or "loop" in stripped):
-                if language == "python":
-                    injected = re.sub(
-                        r"while\s+(\w+)\s*:",
-                        r"while \1 and _depth < 999999:",
-                        stripped,
-                    )
-                    if injected != stripped:
-                        return (i + 1, stripped, injected)
-
-    elif category == "wrong-hash-seed":
-        # Find hash computation — look for hashlib or sha calls
-        patterns_py = [r"hashlib\.sha", r"\.update\(", r"sha1\(", r"sha256\("]
-        patterns_rs = [r"\.update\(", r"Sha1::", r"Sha256::", r"digest\("]
-        patterns = patterns_py if language == "python" else patterns_rs
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            for pat in patterns:
-                if re.search(pat, stripped):
-                    # Introduce a deterministic salt that makes hashes wrong
-                    if language == "python":
-                        if "hashlib.sha" in stripped or "sha1(" in stripped:
-                            injected = stripped.replace(
-                                "hashlib.sha1(", "hashlib.sha1(b'salt' + "
-                            ).replace("sha1(", "hashlib.sha1(b'salt' + ")
-                            if injected != stripped:
-                                return (i + 1, stripped, injected)
-                    else:
-                        if ".update(" in stripped:
-                            # Change update to include a fixed extra byte
-                            injected = stripped.replace(
-                                ".update(", ".update(b\"x\" + "
-                            )
-                            if injected != stripped:
-                                return (i + 1, stripped, injected)
-
-    elif category == "wrong-status":
-        # Find status comparison logic
-        patterns = [
-            r"staged|index|HEAD|head|working|status",
-        ]
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            if re.search(r"staged|status", stripped, re.IGNORECASE):
-                if "def " not in stripped and ("if " in stripped or "==" in stripped or "!=" in stripped):
-                    # Invert or swap a comparison
-                    if "!=" in stripped and ("staged" in stripped.lower() or "index" in stripped.lower()):
-                        injected = stripped.replace("!=", "==", 1)
-                        if injected != stripped:
-                            return (i + 1, stripped, injected)
-
-    elif category == "missing-parent":
-        # Find parent assignment in commit creation
-        patterns_py = [r"['\"]parent['\"]", r"parent\s*=", r"parent_hash"]
-        patterns_rs = [r"parent:", r"parent_hash", r"parent ="]
-        patterns = patterns_py if language == "python" else patterns_rs
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            for pat in patterns:
-                if re.search(pat, stripped):
-                    if language == "python":
-                        # Replace parent value with None or empty string
-                        injected = re.sub(
-                            r"(['\"]parent['\"])\s*:\s*\S+",
-                            r"\1: None",
-                            stripped,
-                        )
-                        if injected == stripped:
-                            injected = re.sub(
-                                r"parent\s*=\s*\S+",
-                                "parent = None",
-                                stripped,
-                            )
-                    else:
-                        injected = re.sub(
-                            r"parent:\s*Some\(\w+\)",
-                            "parent: None",
-                            stripped,
-                        )
-                        if injected == stripped:
-                            injected = re.sub(
-                                r"parent_hash\s*=\s*\S+",
-                                "parent_hash = None",
-                                stripped,
-                            )
-                    if injected != stripped:
-                        return (i + 1, stripped, injected)
-
-    elif category == "index-not-flushed":
-        # Find index write/flush call
-        patterns_py = [
-            r"\.write\s*\(",
-            r"json\.dump\s*\(",
-            r"pickle\.dump\s*\(",
-            r"open\s*\(.+['\"]w['\"]",
-        ]
-        patterns_rs = [
-            r"write_all\s*\(",
-            r"fs::write\s*\(",
-            r"serde_json::to_writer",
-        ]
-        patterns = patterns_py if language == "python" else patterns_rs
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            for pat in patterns:
-                if re.search(pat, stripped):
-                    # Check surrounding lines (not character arithmetic) for 'index' context
-                    context_lines = lines[max(0, i - 5):i + 3]
-                    context = "".join(l.rstrip("\n\r") for l in context_lines).lower()
-                    if "index" in context or "stage" in context:
-                        # Comment out the write call
-                        indent = len(stripped) - len(stripped.lstrip())
-                        indent_str = " " * indent
-                        if language == "python":
-                            injected = indent_str + "pass  # index flush disabled"
-                        else:
-                            injected = indent_str + "// index flush disabled"
-                        return (i + 1, stripped, injected)
-
-    elif category == "wrong-diff-base":
-        # Find diff base resolution
-        patterns = [
-            r"resolve_ref|resolve_head|HEAD|head_hash|head_commit",
-            r"get_commit|read_commit|load_commit",
-        ]
-        for i, line in enumerate(lines):
-            stripped = line.rstrip("\n\r")
-            if "diff" in source_text[max(0, i * 50 - 100):i * 50 + 100].lower():
-                if re.search(r"resolve_ref|resolve_head|HEAD|get_head", stripped, re.IGNORECASE):
-                    if language == "python":
-                        injected = re.sub(
-                            r"(resolve_ref|resolve_head|get_head)\s*\([^)]*\)",
-                            r"self._get_first_commit()",
-                            stripped,
-                        )
-                        if injected == stripped:
-                            injected = re.sub(
-                                r"self\.head\b",
-                                "self._first_commit",
-                                stripped,
-                            )
-                    else:
-                        injected = re.sub(
-                            r"self\.resolve_head\(\)",
-                            "self.get_first_commit()",
-                            stripped,
-                        )
-                    if injected != stripped:
-                        return (i + 1, stripped, injected)
-
-    raise ValueError(
-        f"No injection site found for bug '{bug['id']}' (category: {category}) "
-        f"in source. The injection_strategy may need manual application."
-    )
-
-
 def apply_injection_strategy(source_text: str, bug: dict, language: str) -> tuple:
     """
     Apply the injection strategy for a bug to the source text.
@@ -311,6 +98,19 @@ def apply_injection_strategy(source_text: str, bug: dict, language: str) -> tupl
         raise ValueError(f"Unknown category: {category}")
 
     return inject_fn(lines, language)
+
+
+def _replace_line(lines: list, i: int, orig: str, injected: str) -> tuple:
+    """
+    Replace line i with injected text.
+
+    Returns (modified_source, line_number_1indexed, orig, injected).
+    This helper eliminates the repeated three-line copy-mutate-join pattern
+    that appears throughout the _inject_* functions.
+    """
+    new_lines = list(lines)
+    new_lines[i] = injected + "\n"
+    return "".join(new_lines), i + 1, orig, injected
 
 
 def _inject_off_by_one(lines: list, language: str) -> tuple:
@@ -396,57 +196,32 @@ def _inject_wrong_hash_seed(lines: list, language: str) -> tuple:
             # Find sha1/sha256 call with encode
             m = re.search(r"(hashlib\.(sha1|sha256)\s*\()(.+)(\.encode\(\))", line)
             if m:
-                prefix = line[: m.start()]
-                inner = m.group(3)
                 orig = line
                 injected = line[: m.start(3)] + "'SEED' + " + line[m.start(3):]
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                return _replace_line(lines, i, orig, injected)
             # Find .encode() being hashed
             if "sha" in line.lower() and ".encode(" in line:
-                orig = line
-                injected = line.replace(".encode(", ".encode('utf-8'", 1) if ".encode()" in line else line
                 # Try to prefix the string being hashed with a salt
                 m2 = re.search(r"(f['\"]|['\"])(.+)(['\"]\.encode)", line)
                 if m2:
                     orig = line
-                    injected = (
-                        line[: m2.start(2)]
-                        + "SALT"
-                        + line[m2.start(2):]
-                    )
-                    new_lines = list(lines)
-                    new_lines[i] = injected + "\n"
-                    source = "".join(new_lines)
-                    return source, i + 1, orig, injected
+                    injected = line[: m2.start(2)] + "SALT" + line[m2.start(2):]
+                    return _replace_line(lines, i, orig, injected)
         else:
             # Rust: find hasher.update(...)
             m = re.search(r"(hasher\.update\()(.+?)(\))", line)
             if m:
                 orig = line
-                injected = (
-                    line[: m.start(2)]
-                    + "b\"salt\", "
-                    + line[m.start(2):]
-                )
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                injected = line[: m.start(2)] + "b\"salt\", " + line[m.start(2):]
+                return _replace_line(lines, i, orig, injected)
 
     # Fallback: look for any hash-related line
     for i, raw_line in enumerate(lines):
         line = raw_line.rstrip("\n\r")
         if ("sha1" in line.lower() or "sha256" in line.lower() or "digest" in line.lower()) and "import" not in line:
             orig = line
-            # Add a comment marking the injection site
-            new_lines = list(lines)
             injected = line + "  # wrong-hash-seed injected"
-            new_lines[i] = injected + "\n"
-            source = "".join(new_lines)
-            return source, i + 1, orig, injected
+            return _replace_line(lines, i, orig, injected)
 
     raise ValueError("wrong-hash-seed: no suitable hash call found")
 
@@ -455,36 +230,18 @@ def _inject_wrong_status(lines: list, language: str) -> tuple:
     """Inject wrong-status bug — invert a staged/unstaged comparison."""
     for i, raw_line in enumerate(lines):
         line = raw_line.rstrip("\n\r")
-        if language == "python":
-            # Find staged comparison
-            if ("staged" in line.lower() or "index" in line.lower()) and ("!=" in line or "==" in line):
-                if "def " not in line and "class " not in line and "#" not in line.lstrip()[:1]:
-                    orig = line
-                    if "!=" in line:
-                        injected = line.replace("!=", "==", 1)
-                    else:
-                        injected = line.replace("==", "!=", 1)
-                    if injected != orig:
-                        new_lines = list(lines)
-                        new_lines[i] = injected + "\n"
-                        source = "".join(new_lines)
-                        return source, i + 1, orig, injected
-        else:
-            # Rust: find staged/index comparison
-            if ("staged" in line.lower() or "index" in line.lower()) and ("!=" in line or "==" in line):
-                if "//" not in line.lstrip()[:2]:
-                    orig = line
-                    if "!=" in line:
-                        injected = line.replace("!=", "==", 1)
-                    else:
-                        injected = line.replace("==", "!=", 1)
-                    if injected != orig:
-                        new_lines = list(lines)
-                        new_lines[i] = injected + "\n"
-                        source = "".join(new_lines)
-                        return source, i + 1, orig, injected
+        if ("staged" in line.lower() or "index" in line.lower()) and ("!=" in line or "==" in line):
+            # Skip comment lines and definition lines
+            lstripped = line.lstrip()
+            is_comment = lstripped.startswith("#") if language == "python" else lstripped.startswith("//")
+            if is_comment or "def " in line or "class " in line:
+                continue
+            orig = line
+            injected = line.replace("!=", "==", 1) if "!=" in line else line.replace("==", "!=", 1)
+            if injected != orig:
+                return _replace_line(lines, i, orig, injected)
 
-    # Fallback: find any comparison in a status-related function
+    # Fallback: find any comparison in a status-related function (Python only)
     in_status_fn = False
     for i, raw_line in enumerate(lines):
         line = raw_line.rstrip("\n\r")
@@ -497,10 +254,7 @@ def _inject_wrong_status(lines: list, language: str) -> tuple:
                 orig = line
                 injected = line.replace("!=", "==", 1) if "!=" in line else line.replace("==", "!=", 1)
                 if injected != orig:
-                    new_lines = list(lines)
-                    new_lines[i] = injected + "\n"
-                    source = "".join(new_lines)
-                    return source, i + 1, orig, injected
+                    return _replace_line(lines, i, orig, injected)
 
     raise ValueError("wrong-status: no suitable status comparison found")
 
@@ -515,19 +269,13 @@ def _inject_missing_parent(lines: list, language: str) -> tuple:
             if m and "def " not in line:
                 orig = line
                 injected = line[: m.start(2)] + "None" + line[m.end(2):]
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                return _replace_line(lines, i, orig, injected)
             # Find parent variable assignment
             m2 = re.search(r"(\bparent\b|\bparent_hash\b)\s*=\s*(\S[^\n#]+)", line)
             if m2 and "def " not in line and "None" not in line:
                 orig = line
                 injected = line[: m2.start(2)] + "None"
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                return _replace_line(lines, i, orig, injected)
         else:
             # Rust: find parent: Some(...) assignment
             m = re.search(r"(parent\s*:\s*)Some\((\w+)\)", line)
@@ -536,10 +284,7 @@ def _inject_missing_parent(lines: list, language: str) -> tuple:
                 injected = line[: m.start(1)] + "parent: None"
                 if m.end() < len(line):
                     injected += line[m.end():]
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                return _replace_line(lines, i, orig, injected)
 
     raise ValueError("missing-parent: no suitable parent assignment found")
 
@@ -569,16 +314,12 @@ def _inject_index_not_flushed(lines: list, language: str) -> tuple:
         i, raw_line = candidates[0]
         line = raw_line.rstrip("\n\r")
         orig = line
-        indent = len(line) - len(line.lstrip())
-        indent_str = " " * indent
+        indent_str = " " * (len(line) - len(line.lstrip()))
         if language == "python":
             injected = indent_str + "pass  # index flush disabled (injected bug)"
         else:
             injected = indent_str + "// index flush disabled (injected bug)"
-        new_lines = list(lines)
-        new_lines[i] = injected + "\n"
-        source = "".join(new_lines)
-        return source, i + 1, orig, injected
+        return _replace_line(lines, i, orig, injected)
 
     # Fallback: find any write-like call near the bottom of the file
     for i in range(len(lines) - 1, -1, -1):
@@ -587,12 +328,8 @@ def _inject_index_not_flushed(lines: list, language: str) -> tuple:
         if language == "python":
             if re.search(r"json\.dump|open\s*\(.+['\"]w['\"]|\.write\s*\(", line):
                 orig = line
-                indent = len(line) - len(line.lstrip())
-                injected = " " * indent + "pass  # index flush disabled (injected bug)"
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                injected = " " * (len(line) - len(line.lstrip())) + "pass  # index flush disabled (injected bug)"
+                return _replace_line(lines, i, orig, injected)
 
     raise ValueError("index-not-flushed: no suitable index write call found")
 
@@ -605,12 +342,8 @@ def _inject_wrong_diff_base(lines: list, language: str) -> tuple:
             # Find HEAD resolution in diff context
             m = re.search(r"\b(head|HEAD|current_commit|head_commit|head_hash)\b", line)
             if m:
-                context_before = "".join(
-                    l.rstrip("\n\r") for l in lines[max(0, i - 5):i]
-                ).lower()
-                context_after = "".join(
-                    l.rstrip("\n\r") for l in lines[i:min(i + 5, len(lines))]
-                ).lower()
+                context_before = "".join(l.rstrip("\n\r") for l in lines[max(0, i - 5):i]).lower()
+                context_after = "".join(l.rstrip("\n\r") for l in lines[i:min(i + 5, len(lines))]).lower()
                 if "diff" in context_before + context_after or "compare" in context_before + context_after:
                     orig = line
                     injected = re.sub(
@@ -619,10 +352,7 @@ def _inject_wrong_diff_base(lines: list, language: str) -> tuple:
                         line,
                     )
                     if injected != line:
-                        new_lines = list(lines)
-                        new_lines[i] = injected + "\n"
-                        source = "".join(new_lines)
-                        return source, i + 1, orig, injected
+                        return _replace_line(lines, i, orig, injected)
         else:
             m = re.search(r"\b(head|HEAD|current_commit|head_hash)\b", line)
             if m:
@@ -637,10 +367,7 @@ def _inject_wrong_diff_base(lines: list, language: str) -> tuple:
                         line,
                     )
                     if injected != line:
-                        new_lines = list(lines)
-                        new_lines[i] = injected + "\n"
-                        source = "".join(new_lines)
-                        return source, i + 1, orig, injected
+                        return _replace_line(lines, i, orig, injected)
 
     # Last-resort fallback: mark a line near head-related logic
     for i, raw_line in enumerate(lines):
@@ -648,13 +375,8 @@ def _inject_wrong_diff_base(lines: list, language: str) -> tuple:
         if "HEAD" in line or "head" in line.lower():
             if "def " not in line and "import" not in line and "class " not in line:
                 orig = line
-                indent = len(line) - len(line.lstrip())
-                comment = "  # wrong-diff-base: should use HEAD not initial commit"
-                injected = line + comment
-                new_lines = list(lines)
-                new_lines[i] = injected + "\n"
-                source = "".join(new_lines)
-                return source, i + 1, orig, injected
+                injected = line + "  # wrong-diff-base: should use HEAD not initial commit"
+                return _replace_line(lines, i, orig, injected)
 
     raise ValueError("wrong-diff-base: no suitable diff base reference found")
 
@@ -682,7 +404,6 @@ def apply_bugs_to_source(source_dir: Path, output_dir: Path, bugs: list, languag
         sys.exit(1)
 
     injections = []
-    used_files: dict = {}  # track which files have been modified
 
     for bug in bugs:
         injected_this_bug = False
@@ -842,13 +563,11 @@ def main():
     if not verify_compilation(output_dir, args.language):
         if args.language == "python":
             msg = "Error: seeded implementation fails py_compile. Rolling back."
-        elif args.language == "rust":
+        else:
             msg = (
                 "Error: seeded implementation fails `cargo check` or "
                 "cargo/Cargo.toml is missing. Rolling back."
             )
-        else:
-            msg = "Error: seeded implementation fails compilation checks. Rolling back."
         print(msg, file=sys.stderr)
         shutil.rmtree(output_dir)
         sys.exit(1)

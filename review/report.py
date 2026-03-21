@@ -118,21 +118,9 @@ def _fmt_metric(mean_val, std_val, fmt: str = ".4f") -> str:
     return f"{mean_val:{fmt}} ± {std_val:{fmt}}"
 
 
-def render_experiment_a(metrics_list: list) -> str:
-    """Render Experiment A report — unconstrained condition."""
-    summaries = []
-    for lang in ("python", "rust"):
-        s = aggregate_metrics(metrics_list, "unconstrained", lang)
-        if s["n_runs"] > 0:
-            summaries.append(s)
-
+def _render_experiment_table(summaries: list) -> list:
+    """Return the summary table rows (header + data) for an experiment report."""
     lines = [
-        "# Experiment A — Seeded-Bug Review Accuracy (Unconstrained)",
-        "",
-        "Condition: `unconstrained` — single-pass non-agentic Anthropic Claude review.",
-        "",
-        "## Summary Table",
-        "",
         "| Language | N Runs | DDR (mean ± std) | FPR (mean ± std) | Noise Ratio (mean ± std) | Mean Cost (USD) |",
         "|----------|--------|------------------|------------------|--------------------------|-----------------|",
     ]
@@ -148,7 +136,25 @@ def render_experiment_a(metrics_list: list) -> str:
 
     if not summaries:
         lines.append("| — | 0 | N/A | N/A | N/A | N/A |")
+    return lines
 
+
+def render_experiment_a(metrics_list: list) -> str:
+    """Render Experiment A report — unconstrained condition."""
+    summaries = [
+        s for lang in ("python", "rust")
+        for s in [aggregate_metrics(metrics_list, "unconstrained", lang)]
+        if s["n_runs"] > 0
+    ]
+    lines = [
+        "# Experiment A — Seeded-Bug Review Accuracy (Unconstrained)",
+        "",
+        "Condition: `unconstrained` — single-pass non-agentic Anthropic Claude review.",
+        "",
+        "## Summary Table",
+        "",
+    ]
+    lines += _render_experiment_table(summaries)
     lines += [
         "",
         "## Metrics Definitions",
@@ -165,12 +171,11 @@ def render_experiment_a(metrics_list: list) -> str:
 
 def render_experiment_b(metrics_list: list) -> str:
     """Render Experiment B report — refactory-profile condition."""
-    summaries = []
-    for lang in ("python", "rust"):
-        s = aggregate_metrics(metrics_list, "refactory-profile", lang)
-        if s["n_runs"] > 0:
-            summaries.append(s)
-
+    summaries = [
+        s for lang in ("python", "rust")
+        for s in [aggregate_metrics(metrics_list, "refactory-profile", lang)]
+        if s["n_runs"] > 0
+    ]
     lines = [
         "# Experiment B — Constrained Review (Refactory-Profile)",
         "",
@@ -179,22 +184,8 @@ def render_experiment_b(metrics_list: list) -> str:
         "",
         "## Summary Table",
         "",
-        "| Language | N Runs | DDR (mean ± std) | FPR (mean ± std) | Noise Ratio (mean ± std) | Mean Cost (USD) |",
-        "|----------|--------|------------------|------------------|--------------------------|-----------------|",
     ]
-    for s in summaries:
-        missing_note = _fmt_missing(s["n_missing"])
-        lang = s["language"].capitalize()
-        n_label = f"{s['n_runs']}{missing_note}"
-        ddr = _fmt_metric(s["mean_ddr"], s["std_ddr"])
-        fpr = _fmt_metric(s["mean_fpr"], s["std_fpr"])
-        nr = _fmt_metric(s["mean_noise_ratio"], s["std_noise_ratio"])
-        cost = f"${s['mean_cost_usd']:.4f}" if s["mean_cost_usd"] is not None else "N/A"
-        lines.append(f"| {lang} | {n_label} | {ddr} | {fpr} | {nr} | {cost} |")
-
-    if not summaries:
-        lines.append("| — | 0 | N/A | N/A | N/A | N/A |")
-
+    lines += _render_experiment_table(summaries)
     lines += [
         "",
         "## Refactory-Profile Constraint",

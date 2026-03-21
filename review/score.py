@@ -49,7 +49,7 @@ def _count_file_lines(seeded_dir: str, file_path: str) -> int:
         return DEFAULT_FILE_LINES
 
 
-def compute_tn_count(manifest: dict, review: dict, matched_findings: set) -> int:
+def compute_tn_count(manifest: dict, review: dict) -> int:
     """
     Compute the true negative count.
 
@@ -202,7 +202,7 @@ def score(
     fp_count = max(0, fp_count)
 
     # Compute TN count
-    tn_count = compute_tn_count(manifest, review, tp_finding_indices)
+    tn_count = compute_tn_count(manifest, review)
 
     # Compute metrics
     ddr = tp_count / total_bugs if total_bugs > 0 else 0.0

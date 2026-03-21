@@ -60,11 +60,8 @@ def load_review_responses(reviews_dir: Path) -> list:
         condition = data.get("condition", "")
         language, trial = parse_run_id(run_id)
 
-        # Use language from run_id, but fall back to manifest language if present
-        if hasattr(data, "get"):
-            explicit_lang = data.get("language")
-            if explicit_lang:
-                language = explicit_lang
+        # Use language from run_id, but fall back to explicit language field if present
+        language = data.get("language") or language
 
         records.append(
             {
