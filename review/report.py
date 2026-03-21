@@ -110,7 +110,12 @@ def _fmt_missing(n_missing: int) -> str:
 
 
 def _fmt_metric(mean_val, std_val, fmt: str = ".4f") -> str:
-    """Format mean ± std, rendering N/A when either value is None."""
+    """Format mean ± std for a table cell.
+
+    Returns 'N/A' when *mean_val* is None (no valid data).
+    Returns just the mean (no ± part) when *std_val* is None (single run or
+    undefined std — not the same as no data).
+    """
     if mean_val is None:
         return "N/A"
     if std_val is None:
@@ -274,7 +279,7 @@ def render_experiment_h(token_summary: list) -> str:
     return "\n".join(lines)
 
 
-def render_comparison_table(metrics_list: list, token_summary: list) -> str:
+def render_comparison_table(metrics_list: list) -> str:
     """Render the side-by-side comparison table (SC-005)."""
     rows = []
     for lang in ("python", "rust"):
@@ -354,7 +359,7 @@ def main():
         "experiment-a.md": render_experiment_a(metrics_list),
         "experiment-b.md": render_experiment_b(metrics_list),
         "experiment-h.md": render_experiment_h(token_summary),
-        "comparison-table.md": render_comparison_table(metrics_list, token_summary),
+        "comparison-table.md": render_comparison_table(metrics_list),
     }
 
     for filename, content in reports.items():

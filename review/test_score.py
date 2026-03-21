@@ -347,3 +347,52 @@ def test_run_metrics_schema():
     assert required.issubset(set(metrics.keys())), (
         f"Missing fields: {required - set(metrics.keys())}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test T-2: TN count concrete value using real seeded files (T-2 coverage)
+# ---------------------------------------------------------------------------
+
+def test_tn_count_with_real_files(tmp_path):
+    """
+    Pin the TN window-arithmetic to a concrete expected value.
+
+    Setup: create a 100-line seeded source file in tmp_path.
+    100 lines → 10 windows (WINDOW_SIZE=10).
+    3 bugs at lines 5 (window 0), 25 (window 2), 55 (window 5).
+    3 exact-match findings → all TPs, no FPs.
+    TN = total_windows(10) - injected_bug_windows(3) - fp_windows(0) = 7.
+    """
+    # Build a 100-line source file
+    seeded_dir = tmp_path / "seeded" / "python-1-v2"
+    seeded_dir.mkdir(parents=True)
+    src_file = seeded_dir / "minigit.py"
+    src_file.write_text("\n".join(f"line_{i}" for i in range(1, 101)) + "\n", encoding="utf-8")
+
+    bugs = [
+        make_bug("PY-OBO-LOG",    "minigit.py", 5),   # window 0
+        make_bug("PY-HASH-SEED",  "minigit.py", 25),  # window 2
+        make_bug("PY-INDEX-FLUSH","minigit.py", 55),  # window 5
+    ]
+    findings = [
+        make_finding("F1", "minigit.py", 5),
+        make_finding("F2", "minigit.py", 25),
+        make_finding("F3", "minigit.py", 55),
+    ]
+
+    manifest = {
+        **make_manifest(bugs),
+        "seeded_dir": str(seeded_dir),
+    }
+    review = make_review(findings)
+
+    metrics = score.score(manifest, review)
+
+    assert metrics["tp_count"] == 3
+    assert metrics["fp_count"] == 0
+    assert metrics["fn_count"] == 0
+    # 100 lines → 10 windows; 3 injected-bug windows; 0 false-positive windows
+    assert metrics["tn_count"] == 7, (
+        f"Expected tn_count=7 (10 - 3 injected - 0 fp), got {metrics['tn_count']}"
+    )
+    assert metrics["fpr"] == 0.0

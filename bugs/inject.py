@@ -144,7 +144,8 @@ def _inject_off_by_one(lines: list, language: str) -> tuple:
                 # index i+1 (0-indexed), which is line number i+2 (1-indexed).
                 return source, i + 2, orig, injected
         else:
-            # Rust: find while-let loop over parent chain
+            # Rust: find while-let loop over parent chain and inject a depth
+            # counter that causes the loop to exit one step too early.
             m = re.match(r"^(\s*)while let Some\((\w+)\)\s*=\s*(.+)\{?\s*$", line)
             if m:
                 indent = m.group(1)
@@ -153,19 +154,24 @@ def _inject_off_by_one(lines: list, language: str) -> tuple:
                 orig = line
                 injected = f"{indent}while let Some({var}) = {rest} {{"
                 new_lines = list(lines)
-                # Add a depth guard inside the loop body
-                new_lines[i] = raw_line  # keep original
-                # Find next line in loop body and prepend guard
-                for j in range(i + 1, min(i + 5, len(new_lines))):
+                new_lines[i] = raw_line  # keep original while line unchanged
+                # Insert depth-counter declaration before the loop
+                new_lines.insert(i, f"{indent}let mut _obo_d: usize = 0;\n")
+                # Insert increment + early-break inside loop body
+                for j in range(i + 2, min(i + 6, len(new_lines))):
                     inner = new_lines[j]
                     if inner.strip() and not inner.strip().startswith("//"):
                         inner_indent = indent + "    "
-                        guard = f"{inner_indent}if false {{ break; }}  // obo guard\n"
+                        guard = (
+                            f"{inner_indent}_obo_d += 1; "
+                            f"if _obo_d >= 999999 {{ break; }}  // obo guard\n"
+                        )
                         new_lines.insert(j, guard)
                         source = "".join(new_lines)
-                        return source, i + 1, orig, f"{inner_indent}if false {{ break; }}  // obo guard"
+                        # Loop is now at i+1 (shifted by the inserted decl line)
+                        return source, i + 2, orig, guard.rstrip()
                 source = "".join(new_lines)
-                return source, i + 1, orig, orig
+                return source, i + 2, orig, orig
 
     # Fallback: find any while loop with 'parent' keyword nearby
     for i, raw_line in enumerate(lines):
@@ -197,7 +203,8 @@ def _inject_wrong_hash_seed(lines: list, language: str) -> tuple:
             m = re.search(r"(hashlib\.(sha1|sha256)\s*\()(.+)(\.encode\(\))", line)
             if m:
                 orig = line
-                injected = line[: m.start(3)] + "'SEED' + " + line[m.start(3):]
+                # Prepend bytes literal so hashlib.sha*(<bytes>) still works at runtime
+                injected = line[: m.start(3)] + "b'SEED' + " + line[m.start(3):]
                 return _replace_line(lines, i, orig, injected)
             # Find .encode() being hashed
             if "sha" in line.lower() and ".encode(" in line:
@@ -208,21 +215,24 @@ def _inject_wrong_hash_seed(lines: list, language: str) -> tuple:
                     injected = line[: m2.start(2)] + "SALT" + line[m2.start(2):]
                     return _replace_line(lines, i, orig, injected)
         else:
-            # Rust: find hasher.update(...)
+            # Rust: find hasher.update(...) and split into two calls to inject a
+            # salt while keeping valid Rust (Digest::update takes one argument).
             m = re.search(r"(hasher\.update\()(.+?)(\))", line)
             if m:
                 orig = line
-                injected = line[: m.start(2)] + "b\"salt\", " + line[m.start(2):]
-                return _replace_line(lines, i, orig, injected)
+                data_arg = m.group(2).strip()
+                indent_str = " " * (len(line) - len(line.lstrip()))
+                # Replace the original update() call with a salt call, then insert
+                # the original data call on a new line below.
+                salt_line = f'{indent_str}hasher.update(b"salt");\n'
+                data_line = f'{indent_str}hasher.update({data_arg});\n'
+                new_lines = list(lines)
+                new_lines[i] = salt_line
+                new_lines.insert(i + 1, data_line)
+                source = "".join(new_lines)
+                return source, i + 1, orig, salt_line.rstrip()
 
-    # Fallback: look for any hash-related line
-    for i, raw_line in enumerate(lines):
-        line = raw_line.rstrip("\n\r")
-        if ("sha1" in line.lower() or "sha256" in line.lower() or "digest" in line.lower()) and "import" not in line:
-            orig = line
-            injected = line + "  # wrong-hash-seed injected"
-            return _replace_line(lines, i, orig, injected)
-
+    # No suitable hash call found — do not inject a comment-only no-op.
     raise ValueError("wrong-hash-seed: no suitable hash call found")
 
 
@@ -369,15 +379,7 @@ def _inject_wrong_diff_base(lines: list, language: str) -> tuple:
                     if injected != line:
                         return _replace_line(lines, i, orig, injected)
 
-    # Last-resort fallback: mark a line near head-related logic
-    for i, raw_line in enumerate(lines):
-        line = raw_line.rstrip("\n\r")
-        if "HEAD" in line or "head" in line.lower():
-            if "def " not in line and "import" not in line and "class " not in line:
-                orig = line
-                injected = line + "  # wrong-diff-base: should use HEAD not initial commit"
-                return _replace_line(lines, i, orig, injected)
-
+    # No suitable diff-base reference found — do not inject a comment-only no-op.
     raise ValueError("wrong-diff-base: no suitable diff base reference found")
 
 

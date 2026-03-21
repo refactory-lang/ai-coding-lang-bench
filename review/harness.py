@@ -33,6 +33,15 @@ DEFAULT_MAX_TOKENS = 4096
 DEFAULT_API_KEY_ENV = "ANTHROPIC_API_KEY"
 MAX_RETRIES = 3
 BACKOFF_SECONDS = [2, 4, 8]
+# Anthropic exception class names that indicate a terminal error (no retry).
+TERMINAL_ERROR_NAMES = frozenset({"AuthenticationError", "InvalidRequestError", "PermissionDeniedError"})
+# Anthropic exception class names (and message substrings) for transient/retryable errors.
+TRANSIENT_ERROR_NAMES = frozenset({
+    "RateLimitError", "APIConnectionError", "APITimeoutError",
+    "APIStatusError", "InternalServerError", "ServiceUnavailableError",
+    "OverloadedError", "ConnectionError", "TimeoutError",
+})
+TRANSIENT_ERROR_KEYWORDS = ("rate limit", "timeout", "connection", "503", "529", "overload")
 
 
 def _save_result_and_exit(result: dict, output_path: Path, exit_code: int = 1) -> None:
@@ -269,6 +278,12 @@ def main():
         sys.exit(1)
 
     api_key = os.environ.get(args.api_key_env, "")
+    if not api_key:
+        print(
+            f"Error: {args.api_key_env} environment variable is not set.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Build result skeleton
     result = {
@@ -295,7 +310,7 @@ def main():
     except Exception as exc:
         result["missing_data"] = True
         result["missing_data_reason"] = f"Client creation failed: {exc}"
-        result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        result["reviewed_at"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         _save_result_and_exit(result, output_path)
 
     # Execute API call with retry policy
@@ -307,7 +322,7 @@ def main():
             result["output_tokens"] = api_result["output_tokens"]
             result["finish_reason"] = api_result["finish_reason"]
             result["raw_text"] = api_result["raw_text"]
-            result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            result["reviewed_at"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             result["retry_count"] = attempt
             result["estimated_cost_usd"] = round(
                 (result["input_tokens"] / 1000) * price_in
@@ -321,18 +336,26 @@ def main():
             exc_type = type(exc).__name__
             last_error = str(exc)
 
-            # Check if this is a terminal error (no retry)
-            terminal_names = {"AuthenticationError", "InvalidRequestError", "PermissionDeniedError"}
-            is_terminal = exc_type in terminal_names or "authentication" in str(exc).lower()
+            # Terminal errors (auth, invalid request) — no retry
+            is_terminal = exc_type in TERMINAL_ERROR_NAMES or "authentication" in str(exc).lower()
 
             if is_terminal:
                 result["missing_data"] = True
                 result["missing_data_reason"] = f"{exc_type}: {exc}"
-                result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                result["reviewed_at"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 result["retry_count"] = attempt
                 _save_result_and_exit(result, output_path)
 
-            # Retryable error
+            # Non-terminal: only treat as retryable if it looks like a transient
+            # API/network error.  Application errors (AttributeError, KeyError…)
+            # are re-raised so they propagate rather than silently becoming missing data.
+            is_transient = exc_type in TRANSIENT_ERROR_NAMES or any(
+                kw in str(exc).lower() for kw in TRANSIENT_ERROR_KEYWORDS
+            )
+            if not is_transient:
+                raise  # propagate unexpected application-level errors
+
+            # Retryable transient error
             if attempt < MAX_RETRIES:
                 backoff = BACKOFF_SECONDS[attempt] if attempt < len(BACKOFF_SECONDS) else 8
                 print(
@@ -345,7 +368,7 @@ def main():
                 # All retries exhausted
                 result["missing_data"] = True
                 result["missing_data_reason"] = f"All {MAX_RETRIES} retries exhausted. Last error: {exc}"
-                result["reviewed_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                result["reviewed_at"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                 result["retry_count"] = attempt
                 print(
                     f"Review {run_id} [{args.condition}]: MISSING DATA after {MAX_RETRIES} retries",

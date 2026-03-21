@@ -165,7 +165,7 @@ def test_comparison_table_columns(tmp_path):
         make_run_metrics("rust-1-v2",   "unconstrained",      "rust"),
         make_run_metrics("rust-2-v2",   "refactory-profile",  "rust"),
     ]
-    md = report.render_comparison_table(metrics, [])
+    md = report.render_comparison_table(metrics)
 
     assert "Language" in md
     assert "Condition" in md
@@ -182,7 +182,7 @@ def test_comparison_table_shows_two_languages_two_conditions(tmp_path):
         make_run_metrics("rust-1-v2",   "unconstrained",      "rust"),
         make_run_metrics("rust-2-v2",   "refactory-profile",  "rust"),
     ]
-    md = report.render_comparison_table(metrics, [])
+    md = report.render_comparison_table(metrics)
 
     assert "Python" in md
     assert "Rust" in md
@@ -202,7 +202,7 @@ def test_empty_metrics_graceful():
     md_a = report.render_experiment_a([])
     md_b = report.render_experiment_b([])
     md_h = report.render_experiment_h([])
-    md_c = report.render_comparison_table([], [])
+    md_c = report.render_comparison_table([])
 
     for md in [md_a, md_b, md_h, md_c]:
         assert len(md) > 0

@@ -21,7 +21,7 @@ from pathlib import Path
 
 
 DEFAULT_LINE_TOLERANCE = 5
-# Number of 10-line windows in a "typical" MiniGit file used to estimate TN count
+# Size of each non-overlapping analysis window, in lines.
 # Each source file is divided into non-overlapping 10-line windows.
 # Windows not covered by any finding (and not containing injected bugs) are TN.
 WINDOW_SIZE = 10
@@ -163,7 +163,7 @@ def score(
     # Co-location rule: if multiple bugs share the same (file_path, line_number),
     # any finding matching that location is a TP for ALL bugs at that location.
 
-    # Build a map of (file, window) → list of bug indices
+    # Map (file_path, line_number) → [bug_idx] for co-location matching
     bug_windows: dict = {}  # (file, line_number) → [bug_idx]
     for idx, bug in enumerate(bugs):
         key = (bug["file_path"], bug["line_number"])

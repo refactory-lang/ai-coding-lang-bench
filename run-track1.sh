@@ -150,7 +150,7 @@ echo "--- Phase 1: Building target list ---"
 TARGETS=()
 while IFS= read -r line; do
   [[ -n "$line" ]] && TARGETS+=("$line")
-done < <(cd "$REPO_ROOT" && build_targets 2>/dev/null || true)
+done < <(cd "$REPO_ROOT" && build_targets)
 
 if [[ ${#TARGETS[@]} -eq 0 ]]; then
   echo "WARNING: No target runs found in results/results.json." >&2
