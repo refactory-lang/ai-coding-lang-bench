@@ -99,7 +99,8 @@ def test_all_bugs_detected():
     assert metrics["fn_count"] == 0
     assert metrics["fp_count"] == 0
     assert metrics["ddr"] == 1.0
-    assert metrics["noise_ratio"] == 0.0
+    # FP=0, FN=0 → noise_ratio is undefined (perfect detector, not silent reviewer)
+    assert metrics["noise_ratio"] is None
     assert metrics["missing_data"] is False
 
 

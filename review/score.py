@@ -209,7 +209,14 @@ def score(
     fpr_denom = fp_count + tn_count
     fpr = fp_count / fpr_denom if fpr_denom > 0 else 0.0
     noise_denom = fp_count + fn_count
-    noise_ratio = fp_count / noise_denom if noise_denom > 0 else 0.0
+    # noise_ratio = FP / (FP + FN). When FP=0 and FN=0 (perfect detector,
+    # all bugs found with no false alarms), the denominator is 0 — this is
+    # genuinely undefined and NOT the same as a silent reviewer (FP=0, FN>0).
+    # Return None to distinguish these two cases.
+    if noise_denom > 0:
+        noise_ratio: float | None = fp_count / noise_denom
+    else:
+        noise_ratio = None
 
     return {
         "run_id": run_id,
@@ -224,7 +231,7 @@ def score(
         "tn_count": tn_count,
         "ddr": round(ddr, 4),
         "fpr": round(fpr, 4),
-        "noise_ratio": round(noise_ratio, 4),
+        "noise_ratio": round(noise_ratio, 4) if noise_ratio is not None else None,
         "input_tokens": review.get("input_tokens", 0),
         "output_tokens": review.get("output_tokens", 0),
         "estimated_cost_usd": review.get("estimated_cost_usd", 0.0),

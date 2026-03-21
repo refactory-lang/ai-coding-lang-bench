@@ -234,3 +234,49 @@ def test_summary_schema(tmp_path):
         "total_input_tokens", "total_output_tokens", "total_cost_usd",
     }
     assert required_fields.issubset(set(s.keys()))
+
+
+# ---------------------------------------------------------------------------
+# Test T-8: All-missing group → mean fields are None, not 0.0 (T-8 coverage)
+# ---------------------------------------------------------------------------
+
+def test_all_missing_group_returns_none_means():
+    """
+    When every record in a group is missing_data=True, mean_* fields must be
+    None (no data), not 0.0 (measurably zero).  Ensures alignment with
+    review/report._mean([]) == None.
+    """
+    # Build records in the internal format that aggregate_groups expects
+    # (as produced by load_review_responses — includes language/trial fields).
+    def _internal(run_id, condition, missing=True):
+        lang, trial = token_analysis.parse_run_id(run_id)
+        return {
+            "run_id": run_id,
+            "condition": condition,
+            "language": lang,
+            "trial": trial,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "estimated_cost_usd": 0.0,
+            "missing_data": missing,
+        }
+
+    records = [
+        _internal("python-1-v2", "unconstrained"),
+        _internal("python-2-v2", "unconstrained"),
+        _internal("python-3-v2", "unconstrained"),
+    ]
+    summaries = token_analysis.aggregate_groups(records)
+    assert len(summaries) == 1
+    s = summaries[0]
+
+    assert s["n_runs"] == 3
+    assert s["n_missing"] == 3
+    # All runs missing → no valid token data → means must be None, not 0.0
+    assert s["mean_input_tokens"] is None, (
+        f"Expected mean_input_tokens=None for all-missing group, got {s['mean_input_tokens']}"
+    )
+    assert s["mean_output_tokens"] is None
+    assert s["mean_cost_usd"] is None
+    # Totals are still computable (sum of empty list = 0)
+    assert s["total_cost_usd"] == 0.0

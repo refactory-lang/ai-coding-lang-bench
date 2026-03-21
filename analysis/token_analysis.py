@@ -79,18 +79,24 @@ def load_review_responses(reviews_dir: Path) -> list:
     return records
 
 
-def _mean(values: list) -> float:
+def _mean(values: list):
+    """Return the mean of values, or None if the list is empty (no data)."""
     if not values:
-        return 0.0
+        return None
     return sum(values) / len(values)
 
 
-def _std(values: list) -> float:
+def _std(values: list):
     if len(values) < 2:
-        return 0.0
+        return None
     m = _mean(values)
     variance = sum((x - m) ** 2 for x in values) / (len(values) - 1)
     return math.sqrt(variance)
+
+
+def _round_or_none(value, ndigits: int):
+    """Round value to ndigits, or return None if value is None."""
+    return round(value, ndigits) if value is not None else None
 
 
 def aggregate_groups(records: list) -> list:
@@ -122,12 +128,12 @@ def aggregate_groups(records: list) -> list:
                 "language": language,
                 "n_runs": n_runs,
                 "n_missing": n_missing,
-                "mean_input_tokens": round(_mean(input_tokens), 2),
-                "std_input_tokens": round(_std(input_tokens), 2),
-                "mean_output_tokens": round(_mean(output_tokens), 2),
-                "std_output_tokens": round(_std(output_tokens), 2),
-                "mean_cost_usd": round(_mean(costs), 6),
-                "std_cost_usd": round(_std(costs), 6),
+                "mean_input_tokens": _round_or_none(_mean(input_tokens), 2),
+                "std_input_tokens": _round_or_none(_std(input_tokens), 2),
+                "mean_output_tokens": _round_or_none(_mean(output_tokens), 2),
+                "std_output_tokens": _round_or_none(_std(output_tokens), 2),
+                "mean_cost_usd": _round_or_none(_mean(costs), 6),
+                "std_cost_usd": _round_or_none(_std(costs), 6),
                 "total_input_tokens": sum(input_tokens),
                 "total_output_tokens": sum(output_tokens),
                 "total_cost_usd": round(sum(costs), 6),

@@ -225,10 +225,14 @@ def render_experiment_h(token_summary: list) -> str:
         n = s.get("n_runs", 0)
         missing_note = _fmt_missing(s.get("n_missing", 0))
         n_label = f"{n}{missing_note}"
-        mean_in = f"{s.get('mean_input_tokens', 0):.0f}"
-        mean_out = f"{s.get('mean_output_tokens', 0):.0f}"
-        mean_cost = f"${s.get('mean_cost_usd', 0):.4f}"
-        total_cost = f"${s.get('total_cost_usd', 0):.4f}"
+        mean_in_val = s.get("mean_input_tokens")
+        mean_out_val = s.get("mean_output_tokens")
+        mean_cost_val = s.get("mean_cost_usd")
+        total_cost_val = s.get("total_cost_usd")
+        mean_in = f"{mean_in_val:.0f}" if mean_in_val is not None else "N/A"
+        mean_out = f"{mean_out_val:.0f}" if mean_out_val is not None else "N/A"
+        mean_cost = f"${mean_cost_val:.4f}" if mean_cost_val is not None else "N/A"
+        total_cost = f"${total_cost_val:.4f}" if total_cost_val is not None else "N/A"
         lines.append(
             f"| {lang} | {cond} | {n_label} | {mean_in} | {mean_out} | {mean_cost} | {total_cost} |"
         )
