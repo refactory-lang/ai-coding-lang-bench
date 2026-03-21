@@ -1,2 +1,5 @@
 generated/
 logs/
+experiments/track1/seeded/
+__pycache__/
+*.pyc
