@@ -4,7 +4,7 @@
 
 Benchmark that has Claude Code (Opus) implement "MiniGit" (a minimal git clone) in multiple languages, comparing generation time, LOC, token usage, and pass rate.
 
-Forked from [mame/ai-coding-lang-bench](https://github.com/mame/ai-coding-lang-bench) and extended with the **Refactory Benchmark Programme** — 8 experiments across 3 tracks measuring the reviewability gap, pipeline economics, and thinking clusters for [Refactory](https://github.com/refactory-lang).
+Forked from [mame/ai-coding-lang-bench](https://github.com/mame/ai-coding-lang-bench) and extended with the **Refactory Benchmark Programme** — 7 experiments across 3 tracks measuring the reviewability gap, pipeline economics, and thinking clusters for [Refactory](https://github.com/refactory-lang).
 
 ## Repository Structure
 
@@ -21,7 +21,7 @@ results/
   meta.json          # Environment metadata
   report.md          # Generated report
 figures/             # Generated graphs
-EXPERIMENTS.md       # Refactory Benchmark Programme (8 experiments, 3 tracks)
+EXPERIMENTS.md       # Refactory Benchmark Programme (7 experiments, 3 tracks)
 analysis/            # Token analysis scripts
 bugs/                # Bug injection scripts and seeded-bug catalog
 review/              # Review harness (non-agentic Claude API)
@@ -61,7 +61,7 @@ python3 plot.py                                       # Generate graphs
 
 ## Supported Languages (LANGUAGES hash in benchmark.rb)
 
-rust, go, c, typescript, javascript, java, perl, python, python/mypy, ruby, ruby/steep, lua, scheme, ocaml, haskell
+rust, go, c, typescript, javascript, java, perl, python, python/mypy, ruby, ruby/steep, lua, scheme, ocaml, haskell, php, kotlin, csharp, dart, swift
 
 To add a language, add an entry to the `LANGUAGES` hash. Tests just call `./minigit`, so the implementation only needs to produce an executable with that name.
 
@@ -76,7 +76,7 @@ To add a language, add an entry to the `LANGUAGES` hash. Tests just call `./mini
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full programme:
 
-- **Track 1 (Reviewability Gap)**: Experiments A, B, H — seeded-bug review accuracy, constrained Python review, review token economics
+- **Track 1 (Reviewability Gap)**: Experiments A, B — seeded-bug review accuracy, constrained Python review (review token economics measured within A/B)
 - **Track 2 (Pipeline Economics)**: Experiments C, D, E, F — constrained generation cost, normalize+infer pipeline, JS-to-TS, JS-to-TS-to-Rust
 - **Track 3 (Thinking Clusters)**: Experiment G — extended language matrix (PHP, Kotlin, C#, Dart, Swift)
 

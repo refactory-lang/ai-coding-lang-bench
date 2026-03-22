@@ -1,128 +1,45 @@
-# Bugs
+# Bug Injection
 
-Bug injection scripts and seeded-bug catalog for Track 1 Experiments A and B.
+Parameterised seeded bugs for Track 1 review experiments (Experiments A and B).
 
-## Purpose and Scope
+## Bug Catalog
 
-This directory contains:
+The bug catalog (`catalog.json`) defines language-agnostic logic bugs with:
+- **Difficulty rating** (1-3): how hard the bug is to detect
+- **Bug type**: off-by-one, boundary condition, sort order, hash collision, index error
+- **Description**: language-agnostic description of the bug
+- **Injection sites**: where in the MiniGit implementation to inject each bug
+- **Test-passing guarantee**: bugs are designed to pass the existing test suite but be logically wrong on untested paths
 
-- **`catalog.json`** — Pre-defined, deterministic bug catalog (12 entries: 6 Python + 6 Rust)
-- **`inject.py`** — CLI tool that seeds exactly 3 bugs from the catalog into a MiniGit implementation
-- **`test_inject.py`** — Unit tests for `inject.py`
+## Scripts
 
-The catalog supports **Track 1 Experiment A** (unconstrained review) and **Experiment B** (Refactory-profile constrained review). All bugs are logic errors that survive compilation (`python3 -m py_compile` or `cargo check`) and do not cause all 30 v2 MiniGit test cases to fail (FR-002).
+| Script | Purpose |
+|:-------|:--------|
+| `catalog.json` | Bug catalog with difficulty ratings and language-agnostic descriptions |
+| `inject.rb` | Inject bugs from catalog into a MiniGit implementation |
+| `verify_stealth.sh` | Verify injected bugs still pass the test suite |
 
----
-
-## BugDefinition Schema
-
-Each entry in `catalog.json` follows this schema (see `specs/004-track-1-reviewability/data-model.md` for full details):
-
-```json
-{
-  "id": "PY-OBO-LOG",
-  "category": "off-by-one",
-  "language": "python",
-  "description": "Human-readable description (max 200 chars)",
-  "affected_commands": ["log"],
-  "test_impact": "Which v2 tests fail/pass after injection",
-  "injection_strategy": "Precise mechanical description of the source transformation"
-}
-```
-
-| Field | Type | Allowed Values |
-|-------|------|----------------|
-| `id` | string | Unique; format `{LANG}-{CATEGORY-ABBR}-{COMMAND}` |
-| `category` | string | `off-by-one`, `wrong-hash-seed`, `wrong-status`, `missing-parent`, `index-not-flushed`, `wrong-diff-base` |
-| `language` | string | `python` or `rust` |
-| `description` | string | Max 200 chars |
-| `affected_commands` | string[] | Subset of MiniGit commands |
-| `test_impact` | string | Human-readable description of which tests are affected |
-| `injection_strategy` | string | Deterministic, unambiguous transformation description |
-
-### Bug IDs
-
-| Python ID | Rust ID | Category | Affected Command |
-|-----------|---------|----------|-----------------|
-| `PY-OBO-LOG` | `RS-OBO-LOG` | `off-by-one` | `log` |
-| `PY-HASH-SEED` | `RS-HASH-SEED` | `wrong-hash-seed` | `commit`, `log`, `show` |
-| `PY-STATUS-STAGE` | `RS-STATUS-STAGE` | `wrong-status` | `status` |
-| `PY-PARENT-NULL` | `RS-PARENT-NULL` | `missing-parent` | `commit`, `log` |
-| `PY-INDEX-FLUSH` | `RS-INDEX-FLUSH` | `index-not-flushed` | `add`, `rm`, `status` |
-| `PY-DIFF-BASE` | `RS-DIFF-BASE` | `wrong-diff-base` | `diff` |
-
----
-
-## Adding a New Bug Template
-
-1. Open `bugs/catalog.json`.
-2. Append a new JSON object following the schema above.
-3. Choose an `id` not already in the catalog; use the format `{LANG}-{CATEGORY-ABBR}-{COMMAND}`.
-4. Set `language` to `python` or `rust`.
-5. Write a deterministic `injection_strategy` that describes the exact source transformation (no ambiguity).
-6. Verify the injected bug does **not** prevent compilation and does **not** trip all 30 v2 tests.
-7. Run `python3 -c "import json; c=json.load(open('bugs/catalog.json')); [print(e['id']) for e in c]"` to confirm the new entry loads.
-
----
-
-## inject.py Usage
-
-Inject exactly 3 bugs from the catalog into a MiniGit implementation:
+## Usage
 
 ```bash
-python3 bugs/inject.py \
-  --source-dir generated/minigit-python-1-v2 \
-  --output-dir experiments/track1/seeded/python-1-v2 \
-  --manifest-path experiments/track1/manifests/python-1-v2.json \
-  --language python \
-  --trial 1
+# Inject 3-5 bugs into a Python implementation
+ruby bugs/inject.rb --source generated/minigit-python-1-v2/ --lang python --count 4
+
+# Inject the same bugs into the Rust equivalent
+ruby bugs/inject.rb --source generated/minigit-rust-1-v2/ --lang rust --count 4 --seed 42
+
+# Verify bugs are stealthy (pass existing tests)
+bash bugs/verify_stealth.sh generated/minigit-python-1-v2-bugged/
 ```
 
-### Flags
+## Bug Types
 
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--source-dir` | Yes | Path to the original MiniGit implementation |
-| `--output-dir` | Yes | Where to write the seeded copy |
-| `--manifest-path` | Yes | Where to write the BugManifest JSON |
-| `--language` | Yes | `python` or `rust` |
-| `--trial` | Yes | Trial number (used in `run_id` and as default PRNG seed) |
-| `--bugs` | No | Comma-separated list of exactly 3 bug IDs to inject |
-| `--seed` | No | PRNG seed for deterministic selection (default: `--trial`) |
-
-### Deterministic Bug Selection
-
-When `--bugs` is omitted, bugs are selected deterministically using Python's `random.seed(seed)` seeded with `--seed` (defaulting to `--trial`). This guarantees reproducible injection across runs.
-
-### Output (BugManifest JSON)
-
-```json
-{
-  "run_id": "python-1-v2",
-  "language": "python",
-  "trial": 1,
-  "version": "v2",
-  "source_dir": "generated/minigit-python-1-v2",
-  "seeded_dir": "experiments/track1/seeded/python-1-v2",
-  "injected_at": "2026-03-21T10:00:00Z",
-  "bugs": [
-    {
-      "bug_id": "PY-OBO-LOG",
-      "category": "off-by-one",
-      "file_path": "minigit.py",
-      "line_number": 87,
-      "description": "Log stops one commit early",
-      "original_line": "    while parent:",
-      "injected_line": "    while parent and depth < max_depth - 1:"
-    }
-  ]
-}
-```
-
----
-
-## Running Tests
-
-```bash
-python3 -m pytest bugs/test_inject.py -v
-```
+| Type | Example | Difficulty |
+|:-----|:--------|:-----------|
+| Off-by-one | Loop boundary `< n` vs `<= n` in commit traversal | 1 |
+| Boundary condition | Empty string handling in hash function | 2 |
+| Sort order | Reversed comparison in log ordering | 1 |
+| Hash collision | Incorrect XOR order in MiniHash edge case | 3 |
+| Index error | Wrong array index in multi-file staging | 2 |
+| Silent truncation | Missing newline in output for edge cases | 1 |
+| State leak | Incomplete cleanup in checkout/reset | 2 |

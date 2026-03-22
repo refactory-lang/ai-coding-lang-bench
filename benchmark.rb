@@ -36,9 +36,20 @@ LANGUAGES = {
   'scheme'      => { exts: %w[scm],    version_cmd: 'guile --version | head -1' },
   'ocaml'       => { exts: %w[ml mli], version_cmd: 'ocaml --version' },
   'haskell'     => { exts: %w[hs],     version_cmd: 'ghc --version' },
+  # Track 3 (Experiment G) — Extended Language Matrix
+  'php'         => { exts: %w[php],    version_cmd: 'php --version | head -1' },
+  'kotlin'      => { exts: %w[kt],     version_cmd: 'kotlin -version 2>&1 | head -1' },
+  'csharp'      => { exts: %w[cs],     version_cmd: 'dotnet --version' },
+  'dart'        => { exts: %w[dart],   version_cmd: 'dart --version 2>&1' },
+  'swift'       => { exts: %w[swift],  version_cmd: 'swift --version 2>&1 | head -1' },
 }
 
 TRIALS = 3
+
+# Default model — pin to a specific snapshot for reproducibility across
+# experiment tracks that may run weeks apart (see EXPERIMENTS.md,
+# "Configuration Changes from Upstream").
+DEFAULT_MODEL = 'claude-opus-4-6-20260301'
 
 # ---------------------------------------------------------------------------
 # CLI args
@@ -48,6 +59,7 @@ selected_languages = nil
 selected_trials = TRIALS
 selected_start = 1
 dry_run = false
+model_override = nil
 
 i = 0
 while i < ARGV.length
@@ -61,6 +73,9 @@ while i < ARGV.length
   when '--start', '-s'
     selected_start = ARGV[i + 1].to_i
     i += 2
+  when '--model', '-m'
+    model_override = ARGV[i + 1]
+    i += 2
   when '--dry-run'
     dry_run = true
     i += 1
@@ -68,6 +83,8 @@ while i < ARGV.length
     i += 1
   end
 end
+
+pinned_model = model_override || DEFAULT_MODEL
 
 languages_to_run = selected_languages || LANGUAGES.keys
 
@@ -149,23 +166,56 @@ def parse_claude_output(raw_output)
   return nil unless result_event
 
   usage = result_event['usage'] || {}
+
+  # Extract per-turn token breakdowns for token accumulation curve analysis.
+  # Each assistant turn is logged with its own usage so we can plot how
+  # context growth compounds across turns and determine whether the
+  # iteration tax is linear or superlinear in turn count.
+  per_turn_usage = extract_per_turn_usage(events)
+
   {
     input_tokens: usage['input_tokens'] || 0,
     output_tokens: usage['output_tokens'] || 0,
+    thinking_tokens: usage['thinking_tokens'] || 0,
     cache_creation_tokens: usage['cache_creation_input_tokens'] || 0,
     cache_read_tokens: usage['cache_read_input_tokens'] || 0,
     cost_usd: result_event['total_cost_usd'] || 0.0,
     num_turns: result_event['num_turns'] || 0,
     duration_ms: result_event['duration_ms'] || 0,
+    per_turn: per_turn_usage,
   }
 rescue JSON::ParserError => e
   puts "  WARNING: Failed to parse Claude JSON output: #{e.message}"
   nil
 end
 
-def run_claude(prompt, dir:, log_path: nil)
+# Extract per-turn usage from the stream of events.
+# Looks for assistant message events that carry usage data.
+def extract_per_turn_usage(events)
+  turns = []
+  events.each do |event|
+    next unless event.is_a?(Hash)
+    usage = event['usage']
+    next unless usage
+
+    # Skip the final result event (already captured in aggregate)
+    next if event['type'] == 'result'
+
+    turns << {
+      input_tokens: usage['input_tokens'] || 0,
+      output_tokens: usage['output_tokens'] || 0,
+      thinking_tokens: usage['thinking_tokens'] || 0,
+      cache_read_tokens: usage['cache_read_input_tokens'] || 0,
+      cache_creation_tokens: usage['cache_creation_input_tokens'] || 0,
+    }
+  end
+  turns
+end
+
+def run_claude(prompt, dir:, log_path: nil, model: nil)
   env_prefix = "unset CLAUDECODE && export PATH=#{extra_path}:$PATH && "
-  cmd = "#{env_prefix}claude -p #{Shellwords.escape(prompt)} --dangerously-skip-permissions --output-format json"
+  model_flag = model ? " --model #{Shellwords.escape(model)}" : ''
+  cmd = "#{env_prefix}claude -p #{Shellwords.escape(prompt)} --dangerously-skip-permissions --output-format json#{model_flag}"
 
   puts "  Running Claude..."
   start_time = Time.now
@@ -217,6 +267,7 @@ claude_version_result = run_cmd('claude --version 2>/dev/null || echo unknown')
 claude_version = claude_version_result[:stdout].strip
 
 puts "Claude Version: #{claude_version}"
+puts "Pinned Model: #{pinned_model}"
 puts "Languages: #{languages_to_run.join(', ')}"
 puts "Trials: #{selected_start}..#{selected_start + selected_trials - 1} (#{selected_trials} trials)"
 puts "Dry run: #{dry_run}"
@@ -242,7 +293,7 @@ unless dry_run
   puts '--- Warmup ---'
   warmup_dir = File.join(WORK_DIR, '.warmup')
   FileUtils.mkdir_p(warmup_dir)
-  warmup_result = run_claude('Respond with just the word OK.', dir: warmup_dir)
+  warmup_result = run_claude('Respond with just the word OK.', dir: warmup_dir, model: pinned_model)
   puts "  Warmup done in #{warmup_result[:elapsed_seconds]}s (success=#{warmup_result[:success]})"
   FileUtils.rm_rf(warmup_dir)
   puts
@@ -288,7 +339,7 @@ selected_trials.times do |trial_idx|
       record[:v1_time] = 0
     else
       v1_log = File.join(LOGS_DIR, "minigit-#{dir_name}-#{trial}-v1.json")
-      v1_result = run_claude(v1_prompt, dir: v1_dir, log_path: v1_log)
+      v1_result = run_claude(v1_prompt, dir: v1_dir, log_path: v1_log, model: pinned_model)
       record[:v1_time] = v1_result[:elapsed_seconds]
       record[:v1_claude] = v1_result[:claude_data]
       puts "  Claude finished in #{v1_result[:elapsed_seconds]}s (success=#{v1_result[:success]})"
@@ -321,7 +372,7 @@ selected_trials.times do |trial_idx|
       record[:v2_time] = 0
     else
       v2_log = File.join(LOGS_DIR, "minigit-#{dir_name}-#{trial}-v2.json")
-      v2_result = run_claude(v2_prompt, dir: v2_dir, log_path: v2_log)
+      v2_result = run_claude(v2_prompt, dir: v2_dir, log_path: v2_log, model: pinned_model)
       record[:v2_time] = v2_result[:elapsed_seconds]
       record[:v2_claude] = v2_result[:claude_data]
       puts "  Claude finished in #{v2_result[:elapsed_seconds]}s (success=#{v2_result[:success]})"
@@ -355,6 +406,7 @@ puts '=' * 60
 meta = {
   date: Time.now.strftime('%Y-%m-%d %H:%M:%S'),
   claude_version: claude_version,
+  pinned_model: pinned_model,
   trials: selected_trials,
   versions: versions,
 }
