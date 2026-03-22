@@ -28,6 +28,19 @@ LANGUAGES = {
   'python/mypy' => { exts: %w[py],     version_cmd: 'python3 --version && mypy --version',
                      extra_prompt: 'Write fully type-annotated Python code. All functions must have complete type hints. ' \
                                    'After passing the tests, also verify type correctness by running: mypy --strict *.py' },
+  # Experiment C — Constrained Python (Python-as-Rust profile)
+  'python/refactory' => { exts: %w[py], version_cmd: 'python3 --version && mypy --version',
+                     extra_prompt: 'Write Python code following the Refactory "Python-as-Rust" constrained profile. ' \
+                                   'You MUST follow these rules strictly: ' \
+                                   '(1) Use frozen dataclasses (@dataclass(frozen=True)) for all data structures — no mutable classes. ' \
+                                   '(2) Use Result-style error handling: functions that can fail must return a tuple (value, error) ' \
+                                   'or use a Result wrapper. Do NOT use raise or try/except. ' \
+                                   '(3) Add full PEP 484 type annotations on ALL function signatures, parameters, return types, and variables. ' \
+                                   'No use of Any type. ' \
+                                   '(4) Use Optional/None only explicitly — never implicit None returns. ' \
+                                   '(5) No eval, exec, getattr with dynamic strings, or metaclasses. ' \
+                                   '(6) No *args or **kwargs on public functions. ' \
+                                   'After passing the tests, also verify type correctness by running: mypy --strict *.py' },
   'ruby'        => { exts: %w[rb],     version_cmd: 'ruby --version' },
   'ruby/steep'  => { exts: %w[rb rbs], version_cmd: 'ruby --version && steep --version',
                      extra_prompt: 'Write Ruby code with RBS type signatures. Create .rbs files for all Ruby source files. ' \
